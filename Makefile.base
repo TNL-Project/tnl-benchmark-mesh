@@ -1,0 +1,186 @@
+# Definitions of general variables and rules used throughout the project
+# (included by all sub-Makefiles).
+#
+# vim: ft=make
+
+# variables configurable from command line (e.g. make TNL_CXX=clang++ )
+# or from environment (e.g. TNL_CXX=clang++ make )
+# Note that we have to use TNL_CXX instead of CXX to set the default value,
+# because CXX is an implicit variable defined by GNU make itself. (Thank you!)
+TNL_CXX ?= clang++
+CXX := $(TNL_CXX)
+CUDA_COMPILER ?= clang++
+CUDA_HOST_COMPILER ?= $(CXX)
+# BUILD can be 'Release' or 'Debug'
+BUILD ?= Release
+
+
+# relative paths used in the messages
+mkfile_path := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+current_dir := ./$(subst $(mkfile_path),,$(CURDIR)/)
+current_dir := $(current_dir:./%/=%)
+
+# include colors
+include $(mkfile_path)/Makefile.colors
+
+# make does not have an OR statement...
+ifneq ($(filter $(BUILD),Release Debug),)
+$(info $(shell printf "$(COLOR_BOLD)### Building directory $(current_dir) in $(BUILD) mode$(COLOR_ALL_OFF)" ))
+else
+$(error Wrong BUILD: $(BUILD))
+endif
+
+
+## essential host options
+CPPFLAGS = -MD -MP
+CXXFLAGS = -std=c++14 -Wall -Wno-unused-local-typedefs -Wno-unused-variable
+LDFLAGS = -pthread
+LDLIBS =
+
+ifeq ($(BUILD),Release)
+CXXFLAGS += -O3 -march=native -mtune=native -DNDEBUG
+#CXXFLAGS += -fopt-info-vec-optimized=explicit.log -ftree-vectorize
+else ifeq ($(BUILD),Debug)
+CXXFLAGS += -Og -g
+LDFLAGS += -rdynamic
+endif
+
+
+## options for nvcc
+# automatic dependency generation for nvcc (gcc has it automated in the pre-processor phase with the -MD flag)
+# note that $@ is expanded only when $(CUDA_CPPFLAGS) is used
+CUDA_CPPFLAGS = --compiler-options -MD,-MP,-MT$@
+CUDA_CXXFLAGS = -std=c++14 --compiler-bindir $(CUDA_HOST_COMPILER)
+CUDA_LDLIBS =
+# disable false compiler warnings
+#   reference for the -Xcudafe flag: http://stackoverflow.com/questions/14831051/how-to-disable-compiler-warnings-with-nvcc/17095910#17095910
+#   list of possible tokens: http://www.ssl.berkeley.edu/~jimm/grizzly_docs/SSL/opt/intel/cc/9.0/lib/locale/en_US/mcpcom.msg
+CUDA_CXXFLAGS += --expt-relaxed-constexpr --expt-extended-lambda -Xcudafe "--diag_suppress=code_is_unreachable --diag_suppress=implicit_return_from_non_void_function --diag_suppress=unsigned_compare_with_zero"
+# This diagnostic is just plain wrong in CUDA 9
+# See https://github.com/kokkos/kokkos/issues/1470
+CUDA_CXXFLAGS += -Xcudafe --diag_suppress=esa_on_defaulted_function_ignored
+
+ifeq ($(BUILD),Release)
+CUDA_CXXFLAGS += -O3 -DNDEBUG -Xcompiler -march=native,-mtune=native
+else ifeq ($(BUILD),Debug)
+CUDA_CXXFLAGS += -O0 -g -G
+endif
+
+## options for clang as CUDA compiler
+ifeq ($(CUDA_COMPILER),clang++)
+CUDA_CPPFLAGS = $(CPPFLAGS)
+# immediate expansion of the following two vars
+CUDA_CXXFLAGS := $(CXXFLAGS)
+CUDA_LDFLAGS := $(LDFLAGS)
+# FIXME: better detection
+_CUDA_PATH = $(dir $(subst -I,,$(shell pkg-config --cflags-only-I cuda)))
+CUDA_CXXFLAGS += --cuda-path=$(_CUDA_PATH)
+CUDA_LDFLAGS += -L $(_CUDA_PATH)/lib64/
+ifeq ($(STATIC_LINKING),True)
+CUDA_LDLIBS += -lcudart_static
+else
+CUDA_LDLIBS += -lcudart
+endif
+CUDA_LDLIBS += -ldl -lrt
+# include info for profiling
+#CUDA_CXXFLAGS += -Xcuda-fatbinary --cmdline -Xcuda-fatbinary " --generate-line-info " -Xcuda-ptxas --generate-line-info -g
+# debugging register spills
+#CUDA_CXXFLAGS += -Xcuda-ptxas -v
+# general debugging
+#CUDA_CXXFLAGS += -Xcuda-ptxas -O0 -Xcuda-ptxas --device-debug
+# GP104: cache all global loads in unified L1/Texture cache: http://docs.nvidia.com/cuda/pascal-tuning-guide/index.html#l1-cache
+#CUDA_CXXFLAGS += -Xcuda-ptxas -dlcm=ca
+endif
+
+# select CUDA GPU architecture
+ifeq ($(CUDA_COMPILER),clang++)
+CUDA_CXXFLAGS += $(shell tnl-cuda-arch --clang)
+else
+CUDA_CXXFLAGS += $(shell tnl-cuda-arch)
+endif
+
+
+# append flags for TNL
+PKGS = tnl
+PKGS_CUDA = tnl-cuda
+CXXFLAGS += $(shell pkg-config --cflags $(PKGS))
+CUDA_CXXFLAGS += $(shell pkg-config --cflags $(PKGS_CUDA))
+ifeq ($(STATIC_LINKING),True)
+# hack because cmake does not support shared and static libraries with the same name
+LDLIBS += $(subst tnl,tnl_static,$(shell pkg-config --libs $(PKGS)))
+CUDA_LDLIBS += $(subst tnl,tnl-cuda_static,$(shell pkg-config --libs $(PKGS_CUDA)))
+else
+LDLIBS += $(shell pkg-config --libs $(PKGS))
+CUDA_LDLIBS += $(shell pkg-config --libs $(PKGS_CUDA))
+endif
+
+# OpenMP
+ifeq ($(CXX),clang++)
+OPENMP_CXXFLAGS := -fopenmp=libomp -DHAVE_OPENMP
+OPENMP_LDLIBS := -lomp
+else
+OPENMP_CXXFLAGS := -fopenmp -DHAVE_OPENMP
+OPENMP_LDLIBS := -lgomp
+endif
+
+
+## static linking flags
+ifeq ($(STATIC_LINKING),True)
+LDFLAGS += -static
+CUDA_LDFLAGS += -static
+# GOTCHA: the order of -l flags matters, -ldl should be specified last since other libs often depend on it
+LDLIBS += -ldl
+ifneq ($(CUDA_COMPILER),clang++)
+CUDA_LDLIBS += -ldl
+endif
+endif
+
+
+# base targets
+.PHONY: all cuda host
+all: cuda host
+host: $(TARGETS) subdirs
+cuda: $(CUDA_TARGETS)
+
+# descend into $(SUBDIRS) (when defined)
+.PHONY: subdirs $(SUBDIRS)
+subdirs: $(SUBDIRS)
+
+$(SUBDIRS):
+	$(MAKE) -C $@
+
+# cleanup
+.PHONY: clean
+clean:
+ifdef SOURCES
+	$(RM) $(SOURCES:%.cpp=%.o) $(SOURCES:%.cpp=%.d)
+endif
+ifdef CUDA_SOURCES
+	$(RM) $(CUDA_SOURCES:%.cu=%.cu.o) $(CUDA_SOURCES:%.cu=%.d) $(CUDA_SOURCES:%.cu=%.cu.d)
+endif
+ifdef TARGETS
+	$(RM) $(TARGETS)
+endif
+ifdef CUDA_TARGETS
+	$(RM) $(CUDA_TARGETS)
+endif
+	$(RM) tmpxft_*.d
+
+# recursive cleanup
+.PHONY: distclean
+distclean: clean
+	$(foreach d, $(SUBDIRS), $(MAKE) -C $(d) distclean; )
+
+# LDLIBS have to be specified at the end and in a specific order to make static linking work
+# https://stackoverflow.com/questions/11893996/why-does-the-order-of-l-option-in-gcc-matter/11894098#11894098
+$(TARGETS): % : %.o
+	$(CXX) $(LDFLAGS) -o $@ $< $(LDLIBS)
+
+$(CUDA_TARGETS): % : %.cu.o
+	$(CUDA_COMPILER) $(CUDA_LDFLAGS) -o $@ $< $(CUDA_LDLIBS)
+
+$(SOURCES:%.cpp=%.o): %.o: %.cpp
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c -o $@ $<
+
+$(CUDA_SOURCES:%.cu=%.cu.o): %.cu.o : %.cu
+	$(CUDA_COMPILER) $(CUDA_CPPFLAGS) $(CUDA_CXXFLAGS) -c -o $@ $<
