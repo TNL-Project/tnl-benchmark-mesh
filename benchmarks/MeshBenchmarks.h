@@ -1,0 +1,419 @@
+/***************************************************************************
+                          MeshBenchmarks.h  -  description
+                             -------------------
+    begin                : Nov 21, 2017
+    copyright            : (C) 2017 by Tomas Oberhuber et al.
+    email                : tomas.oberhuber@fjfi.cvut.cz
+ ***************************************************************************/
+
+/* See Copyright Notice in tnl/Copyright */
+
+// Implemented by: Jakub Klinkovsky
+
+#pragma once
+
+#include <TNL/Meshes/Grid.h>
+#include <TNL/Meshes/Mesh.h>
+#include <TNL/Meshes/MeshConfigBase.h>
+#include <TNL/Meshes/Geometry/getEntityCenter.h>
+#include <TNL/Meshes/Geometry/getEntityMeasure.h>
+#include <TNL/Meshes/TypeResolver/TypeResolver.h>
+#include <TNL/DevicePointer.h>
+#include <TNL/ParallelFor.h>
+#include <TNL/StaticFor.h>
+
+#include "../lib_general/MeshOrdering.h"
+
+#include "tnl_benchmarks.h"
+
+using namespace TNL;
+using namespace TNL::Meshes;
+using namespace TNL::benchmarks;
+
+template< typename Mesh >
+struct MeshBenchmarks
+{
+   static_assert( std::is_same< typename Mesh::DeviceType, Devices::Host >::value, "The mesh should be loaded on the host." );
+
+   static bool run( Benchmark & benchmark, const String & meshFile )
+   {
+      // initialization is done at compile-time! (we can't access Mesh::Config::worldDimension at run-time because of linker errors)
+      // TODO: fix this! (e.g. make Mesh::getWorldDimension() method)
+//      constexpr int worldDimension = Mesh::Config::worldDimension;
+
+      Benchmark::MetadataColumns metadataColumns = {
+//         {"mesh-file", meshFile},
+//         {"mesh-config", Mesh::Config::getType()},
+         {"topology", Mesh::Config::CellTopology::getType().replace("Topologies::", "")},
+//         {"wrld dim", worldDimension},
+         {"real", getType< typename Mesh::RealType >()},
+         {"gid_t", getType< typename Mesh::GlobalIndexType >()},
+         {"lid_t", getType< typename Mesh::LocalIndexType >()},
+         {"id_t", getType< typename Mesh::Config::IdType >()},
+         {"order", ""},
+      };
+
+      Mesh mesh;
+      if( ! loadMesh( meshFile, mesh ) ) {
+         std::cerr << "Failed to load mesh from file '" << meshFile << "'." << std::endl;
+         return false;
+      }
+
+      // natural ordering
+      metadataColumns.back() = {"order", "nat"};
+      benchmark.setMetadataColumns( metadataColumns );
+      dispatchAlgorithms( benchmark, mesh );
+
+      // k-d tree ordering
+      metadataColumns.back() = {"order", "kdt"};
+      benchmark.setMetadataColumns( metadataColumns );
+      using KdTreeOrdering = MeshOrdering< Mesh, KdTreeOrdering >;
+      KdTreeOrdering kd;
+      kd.reorder( mesh );
+      dispatchAlgorithms( benchmark, mesh );
+
+      // RCM ordering
+      metadataColumns.back() = {"order", "rcm"};
+      benchmark.setMetadataColumns( metadataColumns );
+      using RCMOrdering = MeshOrdering< Mesh, CuthillMcKeeOrdering<> >;
+      RCMOrdering rcm;
+      rcm.reorder( mesh );
+      dispatchAlgorithms( benchmark, mesh );
+
+      return true;
+   }
+
+   static void dispatchAlgorithms( Benchmark & benchmark, const Mesh & mesh )
+   {
+      StaticFor< int, 1, Mesh::getMeshDimension() + 1, CentersDispatch >::execHost( benchmark, mesh );
+      StaticFor< int, 1, Mesh::getMeshDimension() + 1, MeasuresDispatch >::execHost( benchmark, mesh );
+      SpheresDispatch<>::exec( benchmark, mesh );
+   }
+
+   template< int EntityDimension >
+   struct CentersDispatch
+   {
+      static void exec( Benchmark & benchmark, const Mesh & mesh )
+      {
+         benchmark.setOperation( String("Centers (d = ") + String(EntityDimension) + ")" );
+         benchmark_centers< EntityDimension, Devices::Host >( benchmark, mesh );
+#ifdef HAVE_CUDA
+         benchmark_centers< EntityDimension, Devices::Cuda >( benchmark, mesh );
+#endif
+      }
+   };
+
+   template< int EntityDimension >
+   struct MeasuresDispatch
+   {
+      static void exec( Benchmark & benchmark, const Mesh & mesh )
+      {
+         benchmark.setOperation( String("Measures (d = ") + String(EntityDimension) + ")" );
+         benchmark_measures< EntityDimension, Devices::Host >( benchmark, mesh );
+#ifdef HAVE_CUDA
+         benchmark_measures< EntityDimension, Devices::Cuda >( benchmark, mesh );
+#endif
+      }
+   };
+
+   template< int meshDimension = Mesh::getMeshDimension(), typename = void >
+   struct SpheresDispatch
+   {
+      static void exec( Benchmark & benchmark, const Mesh & mesh )
+      {
+         benchmark.setOperation( "Spheres" );
+         benchmark_spheres< Devices::Host >( benchmark, mesh );
+#ifdef HAVE_CUDA
+         benchmark_spheres< Devices::Cuda >( benchmark, mesh );
+#endif
+      }
+   };
+
+   template< typename _ >
+   struct SpheresDispatch< 1, _ >
+   {
+      static void exec( Benchmark & benchmark, const Mesh & mesh )
+      {
+      }
+   };
+
+   template< int EntityDimension, typename Device >
+   static void benchmark_centers( Benchmark & benchmark, const Mesh & mesh_src )
+   {
+      using Real = typename Mesh::RealType;
+      using Index = typename Mesh::GlobalIndexType;
+      using PointType = typename Mesh::PointType;
+      using DeviceMesh = Meshes::Mesh< typename Mesh::Config, Device >;
+
+      const Index entitiesCount = mesh_src.template getEntitiesCount< EntityDimension >();
+
+      const DeviceMesh mesh = mesh_src;
+      DevicePointer< const DeviceMesh > meshPointer( mesh );
+      Containers::Array< PointType, Device, Index > centers;
+      centers.setSize( PointType::size * entitiesCount );
+
+      auto kernel_measures = [] __cuda_callable__
+         ( Index i,
+           const DeviceMesh* mesh,
+           PointType* array )
+      {
+         const auto& entity = mesh->template getEntity< EntityDimension >( i );
+         array[ i ] = getEntityCenter( *mesh, entity );
+      };
+
+      auto reset = [&]() {
+         centers.setValue( 0.0 );
+      };
+
+      auto benchmark_func = [&] () {
+         ParallelFor< Device >::exec( (Index) 0, entitiesCount,
+                                      kernel_measures,
+                                      &meshPointer.template getData< Device >(),
+                                      centers.getData() );
+      };
+      
+      benchmark.time( reset,
+                      (std::is_same< Device, Devices::Host >::value) ? "CPU" : "GPU",
+                      benchmark_func );
+   }
+
+   template< int EntityDimension, typename Device >
+   static void benchmark_measures( Benchmark & benchmark, const Mesh & mesh_src )
+   {
+      using Real = typename Mesh::RealType;
+      using Index = typename Mesh::GlobalIndexType;
+      using DeviceMesh = Meshes::Mesh< typename Mesh::Config, Device >;
+
+      const Index entitiesCount = mesh_src.template getEntitiesCount< EntityDimension >();
+
+      const DeviceMesh mesh = mesh_src;
+      DevicePointer< const DeviceMesh > meshPointer( mesh );
+      Containers::Array< Real, Device, Index > measures;
+      measures.setSize( entitiesCount );
+
+      auto kernel_measures = [] __cuda_callable__
+         ( Index i,
+           const DeviceMesh* mesh,
+           Real* array )
+      {
+         const auto& entity = mesh->template getEntity< EntityDimension >( i );
+         array[ i ] = getEntityMeasure( *mesh, entity );
+      };
+
+      auto reset = [&]() {
+         measures.setValue( 0.0 );
+      };
+
+      auto benchmark_func = [&] () {
+         ParallelFor< Device >::exec( (Index) 0, entitiesCount,
+                                      kernel_measures,
+                                      &meshPointer.template getData< Device >(),
+                                      measures.getData() );
+      };
+      
+      benchmark.time( reset,
+                      (std::is_same< Device, Devices::Host >::value) ? "CPU" : "GPU",
+                      benchmark_func );
+   }
+
+   template< typename Device >
+   static void benchmark_spheres( Benchmark & benchmark, const Mesh & mesh_src )
+   {
+      using Real = typename Mesh::RealType;
+      using Index = typename Mesh::GlobalIndexType;
+      using LocalIndex = typename Mesh::LocalIndexType;
+      using DeviceMesh = Meshes::Mesh< typename Mesh::Config, Device >;
+
+      const Index entitiesCount = mesh_src.template getEntitiesCount< 0 >();
+
+      const DeviceMesh mesh = mesh_src;
+      DevicePointer< const DeviceMesh > meshPointer( mesh );
+      Containers::Array< Real, Device, Index > spheres;
+      spheres.setSize( entitiesCount );
+
+      auto hasSubvertex = [] __cuda_callable__
+         ( const typename DeviceMesh::Face & face,
+           const Index i )
+      {
+         constexpr auto verticesCount = Mesh::Face::template getSubentitiesCount< 0 >();
+         for( LocalIndex v = 0; v < verticesCount; v++ ) {
+            const auto vid = face.template getSubentityIndex< 0 >( v );
+            if( vid == i )
+               return true;
+         }
+         return false;
+      };
+
+      auto kernel_spheres = [hasSubvertex] __cuda_callable__
+         ( Index i,
+           const DeviceMesh* mesh,
+           Real* array )
+      {
+         Real s = 0.0;
+         const auto& vertex = mesh->template getEntity< 0 >( i );
+         const auto cellsCount = vertex.template getSuperentitiesCount< Mesh::getMeshDimension() >();
+         for( LocalIndex c = 0; c < cellsCount; c++ ) {
+            const auto cid = vertex.template getSuperentityIndex< Mesh::getMeshDimension() >( c );
+            const auto& cell = mesh->template getEntity< Mesh::getMeshDimension() >( cid );
+            constexpr auto facesCount = Mesh::Cell::template getSubentitiesCount< Mesh::getMeshDimension() - 1 >();
+            for( LocalIndex f = 0; f < facesCount; f++ ) {
+               const auto fid = cell.template getSubentityIndex< Mesh::getMeshDimension() - 1 >( f );
+               const auto& face = mesh->template getEntity< Mesh::getMeshDimension() - 1 >( fid );
+               if( ! hasSubvertex( face, i ) )
+                  s += getEntityMeasure( *mesh, face );
+            }
+         }
+         array[ i ] = s;
+      };
+
+      auto reset = [&]() {
+         spheres.setValue( 0.0 );
+      };
+
+      auto benchmark_func = [&] () {
+         ParallelFor< Device >::exec( (Index) 0, entitiesCount,
+                                      kernel_spheres,
+                                      &meshPointer.template getData< Device >(),
+                                      spheres.getData() );
+      };
+      
+      benchmark.time( reset,
+                      (std::is_same< Device, Devices::Host >::value) ? "CPU" : "GPU",
+                      benchmark_func );
+   }
+};
+
+template< typename CellTopology,
+          int WorldDimension,
+          typename Real,
+          typename GlobalIndex,
+          typename LocalIndex,
+          typename Id >
+struct MeshBenchmarksRunner
+{
+    // IMPORTANT NOTE:
+    // The definition of the method must be separate from its declaration,
+    // otherwise the compiler would always do implicit instead of explicit
+    // instantiation.
+    static bool
+    run( Benchmark & benchmark,
+         Benchmark::MetadataMap metadata,
+         const String & meshFile );
+};
+
+template< typename CellTopology,
+          int WorldDimension,
+          typename Real,
+          typename GlobalIndex,
+          typename LocalIndex,
+          typename Id >
+bool
+MeshBenchmarksRunner< CellTopology, WorldDimension, Real, GlobalIndex, LocalIndex, Id >::
+run( Benchmark & benchmark,
+     Benchmark::MetadataMap metadata,
+     const String & meshFile )
+{
+   using Config = MeshConfigBase< CellTopology, WorldDimension, Real, GlobalIndex, LocalIndex, Id >;
+   using MeshType = Mesh< Config, Devices::Host >;
+   return MeshBenchmarks< MeshType >::run( benchmark, meshFile );
+}
+
+extern template struct MeshBenchmarksRunner< Topologies::Edge, 1, float, int, short int, void >;
+extern template struct MeshBenchmarksRunner< Topologies::Edge, 1, float, int, short int, int >;
+extern template struct MeshBenchmarksRunner< Topologies::Edge, 1, float, int, short int, long int >;
+extern template struct MeshBenchmarksRunner< Topologies::Edge, 1, float, int, int, void >;
+extern template struct MeshBenchmarksRunner< Topologies::Edge, 1, float, int, int, int >;
+extern template struct MeshBenchmarksRunner< Topologies::Edge, 1, float, int, int, long int >;
+extern template struct MeshBenchmarksRunner< Topologies::Edge, 1, float, long int, short int, void >;
+extern template struct MeshBenchmarksRunner< Topologies::Edge, 1, float, long int, short int, int >;
+extern template struct MeshBenchmarksRunner< Topologies::Edge, 1, float, long int, short int, long int >;
+extern template struct MeshBenchmarksRunner< Topologies::Edge, 1, float, long int, int, void >;
+extern template struct MeshBenchmarksRunner< Topologies::Edge, 1, float, long int, int, int >;
+extern template struct MeshBenchmarksRunner< Topologies::Edge, 1, float, long int, int, long int >;
+extern template struct MeshBenchmarksRunner< Topologies::Edge, 1, double, int, short int, void >;
+extern template struct MeshBenchmarksRunner< Topologies::Edge, 1, double, int, short int, int >;
+extern template struct MeshBenchmarksRunner< Topologies::Edge, 1, double, int, short int, long int >;
+extern template struct MeshBenchmarksRunner< Topologies::Edge, 1, double, int, int, void >;
+extern template struct MeshBenchmarksRunner< Topologies::Edge, 1, double, int, int, int >;
+extern template struct MeshBenchmarksRunner< Topologies::Edge, 1, double, int, int, long int >;
+extern template struct MeshBenchmarksRunner< Topologies::Edge, 1, double, long int, short int, void >;
+extern template struct MeshBenchmarksRunner< Topologies::Edge, 1, double, long int, short int, int >;
+extern template struct MeshBenchmarksRunner< Topologies::Edge, 1, double, long int, short int, long int >;
+extern template struct MeshBenchmarksRunner< Topologies::Edge, 1, double, long int, int, void >;
+extern template struct MeshBenchmarksRunner< Topologies::Edge, 1, double, long int, int, int >;
+extern template struct MeshBenchmarksRunner< Topologies::Edge, 1, double, long int, int, long int >;
+
+extern template struct MeshBenchmarksRunner< Topologies::Triangle, 2, float, int, short int, void >;
+extern template struct MeshBenchmarksRunner< Topologies::Triangle, 2, float, int, short int, int >;
+extern template struct MeshBenchmarksRunner< Topologies::Triangle, 2, float, int, short int, long int >;
+extern template struct MeshBenchmarksRunner< Topologies::Triangle, 2, float, int, int, void >;
+extern template struct MeshBenchmarksRunner< Topologies::Triangle, 2, float, int, int, int >;
+extern template struct MeshBenchmarksRunner< Topologies::Triangle, 2, float, int, int, long int >;
+extern template struct MeshBenchmarksRunner< Topologies::Triangle, 2, float, long int, short int, void >;
+extern template struct MeshBenchmarksRunner< Topologies::Triangle, 2, float, long int, short int, int >;
+extern template struct MeshBenchmarksRunner< Topologies::Triangle, 2, float, long int, short int, long int >;
+extern template struct MeshBenchmarksRunner< Topologies::Triangle, 2, float, long int, int, void >;
+extern template struct MeshBenchmarksRunner< Topologies::Triangle, 2, float, long int, int, int >;
+extern template struct MeshBenchmarksRunner< Topologies::Triangle, 2, float, long int, int, long int >;
+extern template struct MeshBenchmarksRunner< Topologies::Triangle, 2, double, int, short int, void >;
+extern template struct MeshBenchmarksRunner< Topologies::Triangle, 2, double, int, short int, int >;
+extern template struct MeshBenchmarksRunner< Topologies::Triangle, 2, double, int, short int, long int >;
+extern template struct MeshBenchmarksRunner< Topologies::Triangle, 2, double, int, int, void >;
+extern template struct MeshBenchmarksRunner< Topologies::Triangle, 2, double, int, int, int >;
+extern template struct MeshBenchmarksRunner< Topologies::Triangle, 2, double, int, int, long int >;
+extern template struct MeshBenchmarksRunner< Topologies::Triangle, 2, double, long int, short int, void >;
+extern template struct MeshBenchmarksRunner< Topologies::Triangle, 2, double, long int, short int, int >;
+extern template struct MeshBenchmarksRunner< Topologies::Triangle, 2, double, long int, short int, long int >;
+extern template struct MeshBenchmarksRunner< Topologies::Triangle, 2, double, long int, int, void >;
+extern template struct MeshBenchmarksRunner< Topologies::Triangle, 2, double, long int, int, int >;
+extern template struct MeshBenchmarksRunner< Topologies::Triangle, 2, double, long int, int, long int >;
+
+extern template struct MeshBenchmarksRunner< Topologies::Quadrilateral, 2, float, int, short int, void >;
+extern template struct MeshBenchmarksRunner< Topologies::Quadrilateral, 2, float, int, short int, int >;
+extern template struct MeshBenchmarksRunner< Topologies::Quadrilateral, 2, float, int, short int, long int >;
+extern template struct MeshBenchmarksRunner< Topologies::Quadrilateral, 2, float, int, int, void >;
+extern template struct MeshBenchmarksRunner< Topologies::Quadrilateral, 2, float, int, int, int >;
+extern template struct MeshBenchmarksRunner< Topologies::Quadrilateral, 2, float, int, int, long int >;
+extern template struct MeshBenchmarksRunner< Topologies::Quadrilateral, 2, float, long int, short int, void >;
+extern template struct MeshBenchmarksRunner< Topologies::Quadrilateral, 2, float, long int, short int, int >;
+extern template struct MeshBenchmarksRunner< Topologies::Quadrilateral, 2, float, long int, short int, long int >;
+extern template struct MeshBenchmarksRunner< Topologies::Quadrilateral, 2, float, long int, int, void >;
+extern template struct MeshBenchmarksRunner< Topologies::Quadrilateral, 2, float, long int, int, int >;
+extern template struct MeshBenchmarksRunner< Topologies::Quadrilateral, 2, float, long int, int, long int >;
+extern template struct MeshBenchmarksRunner< Topologies::Quadrilateral, 2, double, int, short int, void >;
+extern template struct MeshBenchmarksRunner< Topologies::Quadrilateral, 2, double, int, short int, int >;
+extern template struct MeshBenchmarksRunner< Topologies::Quadrilateral, 2, double, int, short int, long int >;
+extern template struct MeshBenchmarksRunner< Topologies::Quadrilateral, 2, double, int, int, void >;
+extern template struct MeshBenchmarksRunner< Topologies::Quadrilateral, 2, double, int, int, int >;
+extern template struct MeshBenchmarksRunner< Topologies::Quadrilateral, 2, double, int, int, long int >;
+extern template struct MeshBenchmarksRunner< Topologies::Quadrilateral, 2, double, long int, short int, void >;
+extern template struct MeshBenchmarksRunner< Topologies::Quadrilateral, 2, double, long int, short int, int >;
+extern template struct MeshBenchmarksRunner< Topologies::Quadrilateral, 2, double, long int, short int, long int >;
+extern template struct MeshBenchmarksRunner< Topologies::Quadrilateral, 2, double, long int, int, void >;
+extern template struct MeshBenchmarksRunner< Topologies::Quadrilateral, 2, double, long int, int, int >;
+extern template struct MeshBenchmarksRunner< Topologies::Quadrilateral, 2, double, long int, int, long int >;
+
+extern template struct MeshBenchmarksRunner< Topologies::Tetrahedron, 3, float, int, short int, void >;
+extern template struct MeshBenchmarksRunner< Topologies::Tetrahedron, 3, float, int, short int, int >;
+extern template struct MeshBenchmarksRunner< Topologies::Tetrahedron, 3, float, int, short int, long int >;
+extern template struct MeshBenchmarksRunner< Topologies::Tetrahedron, 3, float, int, int, void >;
+extern template struct MeshBenchmarksRunner< Topologies::Tetrahedron, 3, float, int, int, int >;
+extern template struct MeshBenchmarksRunner< Topologies::Tetrahedron, 3, float, int, int, long int >;
+extern template struct MeshBenchmarksRunner< Topologies::Tetrahedron, 3, float, long int, short int, void >;
+extern template struct MeshBenchmarksRunner< Topologies::Tetrahedron, 3, float, long int, short int, int >;
+extern template struct MeshBenchmarksRunner< Topologies::Tetrahedron, 3, float, long int, short int, long int >;
+extern template struct MeshBenchmarksRunner< Topologies::Tetrahedron, 3, float, long int, int, void >;
+extern template struct MeshBenchmarksRunner< Topologies::Tetrahedron, 3, float, long int, int, int >;
+extern template struct MeshBenchmarksRunner< Topologies::Tetrahedron, 3, float, long int, int, long int >;
+extern template struct MeshBenchmarksRunner< Topologies::Tetrahedron, 3, double, int, short int, void >;
+extern template struct MeshBenchmarksRunner< Topologies::Tetrahedron, 3, double, int, short int, int >;
+extern template struct MeshBenchmarksRunner< Topologies::Tetrahedron, 3, double, int, short int, long int >;
+extern template struct MeshBenchmarksRunner< Topologies::Tetrahedron, 3, double, int, int, void >;
+extern template struct MeshBenchmarksRunner< Topologies::Tetrahedron, 3, double, int, int, int >;
+extern template struct MeshBenchmarksRunner< Topologies::Tetrahedron, 3, double, int, int, long int >;
+extern template struct MeshBenchmarksRunner< Topologies::Tetrahedron, 3, double, long int, short int, void >;
+extern template struct MeshBenchmarksRunner< Topologies::Tetrahedron, 3, double, long int, short int, int >;
+extern template struct MeshBenchmarksRunner< Topologies::Tetrahedron, 3, double, long int, short int, long int >;
+extern template struct MeshBenchmarksRunner< Topologies::Tetrahedron, 3, double, long int, int, void >;
+extern template struct MeshBenchmarksRunner< Topologies::Tetrahedron, 3, double, long int, int, int >;
+extern template struct MeshBenchmarksRunner< Topologies::Tetrahedron, 3, double, long int, int, long int >;

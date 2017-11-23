@@ -1,5 +1,7 @@
+MESH_BENCHMARK_TEMPLATES = $(sort $(wildcard MeshBenchmarks.templates/MeshBenchmarks.t*.cpp))
+
 TARGETS = linear-solvers matrix-writer
-SOURCES = linear-solvers.cpp matrix-writer.cpp
+SOURCES = linear-solvers.cpp matrix-writer.cpp tnl-benchmark-mesh.cpp $(MESH_BENCHMARK_TEMPLATES)
 CUDA_TARGETS = linear-solvers-cuda
 CUDA_SOURCES = linear-solvers-cuda.cu
 
@@ -14,6 +16,13 @@ CXXFLAGS += -DHAVE_UMFPACK -DHAVE_METIS $(OPENMP_CXXFLAGS)
 LDLIBS += -lmetis -lumfpack $(OPENMP_LDLIBS)
 CUDA_CXXFLAGS += -DHAVE_METIS
 CUDA_LDLIBS += -lcusparse -lmetis
+
+# aggregation rules for tnl-benchmark-mesh
+host: tnl-benchmark-mesh
+tnl-benchmark-mesh: tnl-benchmark-mesh.o $(MESH_BENCHMARK_TEMPLATES:%.cpp=%.o)
+	$(CXX) -o $@ $^ $(LDFLAGS)
+#tnl-benchmark-mesh-cuda: tnl-benchmark-mesh-cuda.o $(MESH_BENCHMARK_TEMPLATES:%.cu=%.cu.o)
+#	$(CUDA_COMPILER) $(CUDA_LDFLAGS) -o $@ $^
 
 -include $(SOURCES:%.cpp=%.d)
 
