@@ -14,8 +14,9 @@ os.mkdir(dirname)
 i = 0
 for line in open(src).readlines():
     if line.strip().startswith("extern template"):
-        out = open("{}/{}.t{}.cpp".format(dirname, basename, i), "w")
-        out.write("#include \"../{}.h\"\n".format(basename))
-        out.write(line.strip().replace("extern ", "", 1))
-        out.close()
+        for ext in ["cpp", "cu"]:
+            out = open("{}/{}.t{}.{}".format(dirname, basename, i, ext), "w")
+            out.write("#include \"../{}.h\"\n".format(basename))
+            out.write(line.strip().replace("extern ", "", 1))
+            out.close()
         i += 1

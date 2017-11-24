@@ -1,9 +1,10 @@
-MESH_BENCHMARK_TEMPLATES = $(sort $(wildcard MeshBenchmarks.templates/MeshBenchmarks.t*.cpp))
+MESH_BENCHMARK_TEMPLATES_CPP = $(sort $(wildcard MeshBenchmarks.templates/MeshBenchmarks.t*.cpp))
+MESH_BENCHMARK_TEMPLATES_CU = $(sort $(wildcard MeshBenchmarks.templates/MeshBenchmarks.t*.cu))
 
 TARGETS = linear-solvers matrix-writer
-SOURCES = linear-solvers.cpp matrix-writer.cpp tnl-benchmark-mesh.cpp $(MESH_BENCHMARK_TEMPLATES)
+SOURCES = linear-solvers.cpp matrix-writer.cpp tnl-benchmark-mesh.cpp $(MESH_BENCHMARK_TEMPLATES_CPP)
 CUDA_TARGETS = linear-solvers-cuda
-CUDA_SOURCES = linear-solvers-cuda.cu
+CUDA_SOURCES = linear-solvers-cuda.cu tnl-benchmark-mesh-cuda.cu $(MESH_BENCHMARK_TEMPLATES_CU)
 
 # include general rules
 include ../Makefile.base
@@ -19,10 +20,11 @@ CUDA_LDLIBS += -lcusparse -lmetis
 
 # aggregation rules for tnl-benchmark-mesh
 host: tnl-benchmark-mesh
-tnl-benchmark-mesh: tnl-benchmark-mesh.o $(MESH_BENCHMARK_TEMPLATES:%.cpp=%.o)
+tnl-benchmark-mesh: tnl-benchmark-mesh.o $(MESH_BENCHMARK_TEMPLATES_CPP:%.cpp=%.o)
 	$(CXX) -o $@ $^ $(LDFLAGS)
-#tnl-benchmark-mesh-cuda: tnl-benchmark-mesh-cuda.o $(MESH_BENCHMARK_TEMPLATES:%.cu=%.cu.o)
-#	$(CUDA_COMPILER) $(CUDA_LDFLAGS) -o $@ $^
+cuda: tnl-benchmark-mesh-cuda
+tnl-benchmark-mesh-cuda: tnl-benchmark-mesh-cuda.cu.o $(MESH_BENCHMARK_TEMPLATES_CU:%.cu=%.cu.o)
+	$(CUDA_COMPILER) $(CUDA_LDFLAGS) -o $@ $^
 
 -include $(SOURCES:%.cpp=%.d)
 
