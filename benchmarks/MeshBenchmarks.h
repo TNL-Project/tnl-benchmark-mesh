@@ -87,7 +87,7 @@ struct MeshBenchmarks
    {
       StaticFor< int, 1, Mesh::getMeshDimension() + 1, CentersDispatch >::execHost( benchmark, mesh );
       StaticFor< int, 1, Mesh::getMeshDimension() + 1, MeasuresDispatch >::execHost( benchmark, mesh );
-      SpheresDispatch<>::exec( benchmark, mesh );
+      SpheresDispatch::exec( benchmark, mesh );
    }
 
    template< int EntityDimension >
@@ -116,10 +116,14 @@ struct MeshBenchmarks
       }
    };
 
-   template< int meshDimension = Mesh::getMeshDimension(), typename = void >
    struct SpheresDispatch
    {
-      static void exec( Benchmark & benchmark, const Mesh & mesh )
+      template< typename M,
+                typename = typename std::enable_if<
+                              std::is_same< typename M::Config::CellTopology, Topologies::Triangle >::value ||
+                              std::is_same< typename M::Config::CellTopology, Topologies::Tetrahedron >::value
+                           >::type >
+      static void exec( Benchmark & benchmark, const M & mesh )
       {
          benchmark.setOperation( "Spheres" );
          benchmark_spheres< Devices::Host >( benchmark, mesh );
@@ -127,12 +131,14 @@ struct MeshBenchmarks
          benchmark_spheres< Devices::Cuda >( benchmark, mesh );
 #endif
       }
-   };
 
-   template< typename _ >
-   struct SpheresDispatch< 1, _ >
-   {
-      static void exec( Benchmark & benchmark, const Mesh & mesh )
+      template< typename M,
+                typename = typename std::enable_if< !(
+                              std::is_same< typename M::Config::CellTopology, Topologies::Triangle >::value ||
+                              std::is_same< typename M::Config::CellTopology, Topologies::Tetrahedron >::value
+                           ) >::type,
+                typename = void >
+      static void exec( Benchmark & benchmark, const M & mesh )
       {
       }
    };
@@ -219,6 +225,10 @@ struct MeshBenchmarks
    template< typename Device >
    static void benchmark_spheres( Benchmark & benchmark, const Mesh & mesh_src )
    {
+      static_assert( std::is_same< typename Mesh::Config::CellTopology, Topologies::Triangle >::value ||
+                     std::is_same< typename Mesh::Config::CellTopology, Topologies::Tetrahedron >::value,
+                     "The algorithm works only on triangles and tetrahedrons." );
+
       using Real = typename Mesh::RealType;
       using Index = typename Mesh::GlobalIndexType;
       using LocalIndex = typename Mesh::LocalIndexType;
@@ -244,7 +254,23 @@ struct MeshBenchmarks
          return false;
       };
 
-      auto kernel_spheres = [hasSubvertex] __cuda_callable__
+      auto getLocalVertexIndex = [] __cuda_callable__
+         ( const typename DeviceMesh::Cell & cell,
+           const Index i )
+      {
+         constexpr auto verticesCount = Mesh::Cell::template getSubentitiesCount< 0 >();
+         for( LocalIndex v = 0; v < verticesCount; v++ ) {
+            const auto vid = cell.template getSubentityIndex< 0 >( v );
+            if( vid == i ) {
+               return v;
+            }
+         }
+         TNL_ASSERT( false,
+                     std::cerr << "local vertex index not found -- this is a BUG!" << std::endl; );
+         return (LocalIndex) 0;
+      };
+
+      auto kernel_spheres = [getLocalVertexIndex] __cuda_callable__
          ( Index i,
            const DeviceMesh* mesh,
            Real* array )
@@ -255,13 +281,19 @@ struct MeshBenchmarks
          for( LocalIndex c = 0; c < cellsCount; c++ ) {
             const auto cid = vertex.template getSuperentityIndex< Mesh::getMeshDimension() >( c );
             const auto& cell = mesh->template getEntity< Mesh::getMeshDimension() >( cid );
-            constexpr auto facesCount = Mesh::Cell::template getSubentitiesCount< Mesh::getMeshDimension() - 1 >();
-            for( LocalIndex f = 0; f < facesCount; f++ ) {
-               const auto fid = cell.template getSubentityIndex< Mesh::getMeshDimension() - 1 >( f );
-               const auto& face = mesh->template getEntity< Mesh::getMeshDimension() - 1 >( fid );
-               if( ! hasSubvertex( face, i ) )
-                  s += getEntityMeasure( *mesh, face );
-            }
+            // general version, but very slow
+//            constexpr auto facesCount = Mesh::Cell::template getSubentitiesCount< Mesh::getMeshDimension() - 1 >();
+//            for( LocalIndex f = 0; f < facesCount; f++ ) {
+//               const auto fid = cell.template getSubentityIndex< Mesh::getMeshDimension() - 1 >( f );
+//               const auto& face = mesh->template getEntity< Mesh::getMeshDimension() - 1 >( fid );
+//               if( ! hasSubvertex( face, i ) )
+//                  s += getEntityMeasure( *mesh, face );
+//            }
+            // specialized version for simplices (assuming that opposite vertex and face have the same local index)
+            const auto f = getLocalVertexIndex( cell, i );
+            const auto fid = cell.template getSubentityIndex< Mesh::getMeshDimension() - 1 >( f );
+            const auto& face = mesh->template getEntity< Mesh::getMeshDimension() - 1 >( fid );
+            s += getEntityMeasure( *mesh, face );
          }
          array[ i ] = s;
       };
