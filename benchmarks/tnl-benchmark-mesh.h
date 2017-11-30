@@ -72,21 +72,21 @@ resolveCellTopology( Benchmark & benchmark,
       return false;
    }
 
-   using Readers::VTKEntityType;
-   switch( reader.getCellVTKType() )
+   using Readers::EntityShape;
+   switch( reader.getCellShape() )
    {
-      case VTKEntityType::Line:
+      case EntityShape::Line:
          return setMeshParameters< Topologies::Edge >( benchmark, metadata, meshFile );
-      case VTKEntityType::Triangle:
+      case EntityShape::Triangle:
          return setMeshParameters< Topologies::Triangle >( benchmark, metadata, meshFile );
-      case VTKEntityType::Quad:
+      case EntityShape::Quad:
          return setMeshParameters< Topologies::Quadrilateral >( benchmark, metadata, meshFile );
-      case VTKEntityType::Tetra:
+      case EntityShape::Tetra:
          return setMeshParameters< Topologies::Tetrahedron >( benchmark, metadata, meshFile );
-//      case VTKEntityType::Hexahedron:
+//      case EntityShape::Hexahedron:
 //         return setMeshParameters< Topologies::Hexahedron >( benchmark, metadata, meshFile );
       default:
-         std::cerr << "unsupported cell topology: " << reader.getCellVTKType() << std::endl;
+         std::cerr << "unsupported cell topology: " << reader.getCellShape() << std::endl;
          return false;
    }
 }
