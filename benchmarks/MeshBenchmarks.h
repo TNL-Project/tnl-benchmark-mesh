@@ -22,6 +22,10 @@
 #include <TNL/ParallelFor.h>
 #include <TNL/StaticFor.h>
 
+#ifdef HAVE_CUDA
+#include <cuda_profiler_api.h>
+#endif
+
 #include "../lib_general/MeshOrdering.h"
 
 #include "tnl_benchmarks.h"
@@ -72,6 +76,10 @@ struct MeshBenchmarks
       kd.reorder( mesh );
       dispatchAlgorithms( benchmark, mesh );
 
+#ifdef HAVE_CUDA
+      cudaProfilerStart();
+#endif
+
       // RCM ordering
       metadataColumns.back() = {"order", "rcm"};
       benchmark.setMetadataColumns( metadataColumns );
@@ -79,6 +87,10 @@ struct MeshBenchmarks
       RCMOrdering rcm;
       rcm.reorder( mesh );
       dispatchAlgorithms( benchmark, mesh );
+
+#ifdef HAVE_CUDA
+      cudaProfilerStop();
+#endif
 
       return true;
    }
