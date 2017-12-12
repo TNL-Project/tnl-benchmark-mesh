@@ -14,7 +14,7 @@
 
 #include <TNL/Meshes/Grid.h>
 #include <TNL/Meshes/Mesh.h>
-#include <TNL/Meshes/MeshConfigBase.h>
+#include <TNL/Meshes/DefaultConfig.h>
 #include <TNL/Meshes/Geometry/getEntityCenter.h>
 #include <TNL/Meshes/Geometry/getEntityMeasure.h>
 #include <TNL/Meshes/TypeResolver/TypeResolver.h>
@@ -476,7 +476,7 @@ run( Benchmark & benchmark,
      Benchmark::MetadataMap metadata,
      const String & meshFile )
 {
-   using Config = MeshConfigBase< CellTopology, WorldDimension, Real, GlobalIndex, LocalIndex, Id >;
+   using Config = DefaultConfig< CellTopology, WorldDimension, Real, GlobalIndex, LocalIndex, Id >;
    using MeshType = Mesh< Config, Devices::Host >;
    return MeshBenchmarks< MeshType >::run( benchmark, meshFile );
 }
