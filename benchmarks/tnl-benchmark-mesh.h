@@ -53,7 +53,7 @@ setMeshParameters( Params&&... params )
                  MeshBenchmarksRunner< MinimalConfig, CellTopology, WorldDimension, double, long int, short int, long int >::run( std::forward<Params>(params)... ) &&
                  MeshBenchmarksRunner< MinimalConfig, CellTopology, WorldDimension, double, long int, int, void >::run( std::forward<Params>(params)... ) &&
                  MeshBenchmarksRunner< MinimalConfig, CellTopology, WorldDimension, double, long int, int, int >::run( std::forward<Params>(params)... ) &&
-                 MeshBenchmarksRunner< MinimalConfig, CellTopology, WorldDimension, double, long int, int, long int >::run( std::forward<Params>(params)... );
+                 MeshBenchmarksRunner< MinimalConfig, CellTopology, WorldDimension, double, long int, int, long int >::run( std::forward<Params>(params)... ) &&
                  MeshBenchmarksRunner< FullConfig, CellTopology, WorldDimension, float, int, short int, void >::run( std::forward<Params>(params)... ) &&
                  MeshBenchmarksRunner< FullConfig, CellTopology, WorldDimension, float, int, short int, int >::run( std::forward<Params>(params)... ) &&
                  MeshBenchmarksRunner< FullConfig, CellTopology, WorldDimension, float, int, short int, long int >::run( std::forward<Params>(params)... ) &&
