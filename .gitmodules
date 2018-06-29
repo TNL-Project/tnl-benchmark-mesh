@@ -1,0 +1,3 @@
+[submodule "libs/spatial"]
+	path = libs/spatial
+	url = git://git.code.sf.net/p/spatial/code

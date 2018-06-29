@@ -25,7 +25,7 @@
 #include <cuda_profiler_api.h>
 #endif
 
-#include "../lib_general/MeshOrdering.h"
+#include "MeshOrdering.h"
 
 #include "MeshConfigs.h"
 #include "tnl_benchmarks.h"
