@@ -285,6 +285,10 @@ class MeshOrdering< TNL::Meshes::Mesh< MeshConfig, Device >, OrderingMethod >
 
     PermutationVector perm_vertices, iperm_vertices, perm_faces, iperm_faces, perm_cells, iperm_cells;
 
+// nvcc does not allow __cuda_callable__ lambdas inside private or protected sections
+#ifdef __NVCC__
+public:
+#endif
     template< typename Vector >
     static void _reorder_vector( Vector& vector, const PermutationVector& perm )
     {
