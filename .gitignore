@@ -1,0 +1,8 @@
+*.o
+*.so
+*.d
+
+# targets
+/MeshBenchmarks.templates/
+/tnl-benchmark-mesh
+/tnl-benchmark-mesh-cuda

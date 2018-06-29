@@ -1,22 +1,18 @@
+ifeq ("$(wildcard MeshBenchmarks.templates/)","")
+$(shell python3 ./MeshBenchmarks.py)
+endif
+
 MESH_BENCHMARK_TEMPLATES_CPP = $(sort $(wildcard MeshBenchmarks.templates/MeshBenchmarks.t*.cpp))
 MESH_BENCHMARK_TEMPLATES_CU = $(sort $(wildcard MeshBenchmarks.templates/MeshBenchmarks.t*.cu))
 
-TARGETS = linear-solvers matrix-writer
-SOURCES = linear-solvers.cpp matrix-writer.cpp tnl-benchmark-mesh.cpp $(MESH_BENCHMARK_TEMPLATES_CPP)
-CUDA_TARGETS = linear-solvers-cuda
-CUDA_SOURCES = linear-solvers-cuda.cu tnl-benchmark-mesh-cuda.cu $(MESH_BENCHMARK_TEMPLATES_CU)
+SOURCES = tnl-benchmark-mesh.cpp $(MESH_BENCHMARK_TEMPLATES_CPP)
+CUDA_SOURCES = tnl-benchmark-mesh-cuda.cu $(MESH_BENCHMARK_TEMPLATES_CU)
 
 # include general rules
-include ../Makefile.base
+include Makefile.base
 
-#CXXFLAGS += -DHAVE_UMFPACK -DHAVE_METIS -DHAVE_ARMADILLO $(OPENMP_CXXFLAGS)
-#LDLIBS += -lmetis -larmadillo -lumfpack $(OPENMP_LDLIBS)
-#CUDA_CXXFLAGS += -DHAVE_METIS $(OPENMP_CXXFLAGS)
-#CUDA_LDLIBS += -lcusparse -lmetis $(OPENMP_LDLIBS)
-CXXFLAGS += -DHAVE_UMFPACK -DHAVE_METIS $(OPENMP_CXXFLAGS)
-LDLIBS += -lmetis -lumfpack $(OPENMP_LDLIBS)
-CUDA_CXXFLAGS += -DHAVE_METIS
-CUDA_LDLIBS += -lcusparse -lmetis
+CXXFLAGS += $(OPENMP_CXXFLAGS)
+LDLIBS += $(OPENMP_LDLIBS)
 
 # aggregation rules for tnl-benchmark-mesh
 host: tnl-benchmark-mesh
@@ -25,6 +21,9 @@ tnl-benchmark-mesh: tnl-benchmark-mesh.o $(MESH_BENCHMARK_TEMPLATES_CPP:%.cpp=%.
 cuda: tnl-benchmark-mesh-cuda
 tnl-benchmark-mesh-cuda: tnl-benchmark-mesh-cuda.cu.o $(MESH_BENCHMARK_TEMPLATES_CU:%.cu=%.cu.o)
 	$(CUDA_COMPILER) $(CUDA_LDFLAGS) -o $@ $^
+
+clean:
+	$(RM) -r MeshBenchmarks.templates/
 
 -include $(SOURCES:%.cpp=%.d)
 
