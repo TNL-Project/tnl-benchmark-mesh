@@ -17,10 +17,10 @@ LDLIBS += $(OPENMP_LDLIBS)
 # aggregation rules for tnl-benchmark-mesh
 host: tnl-benchmark-mesh
 tnl-benchmark-mesh: tnl-benchmark-mesh.o $(MESH_BENCHMARK_TEMPLATES_CPP:%.cpp=%.o)
-	$(CXX) -o $@ $^ $(LDFLAGS)
+	$(CXX) $(LDFLAGS) -o $@ $^ $(LDLIBS)
 cuda: tnl-benchmark-mesh-cuda
 tnl-benchmark-mesh-cuda: tnl-benchmark-mesh-cuda.cu.o $(MESH_BENCHMARK_TEMPLATES_CU:%.cu=%.cu.o)
-	$(CUDA_COMPILER) $(CUDA_LDFLAGS) -o $@ $^
+	$(CUDA_COMPILER) $(CUDA_LDFLAGS) -o $@ $^ $(CUDA_LDLIBS)
 
 clean:
 	$(RM) -r MeshBenchmarks.templates/
