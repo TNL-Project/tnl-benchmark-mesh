@@ -33,7 +33,7 @@ endif
 
 ## essential host options
 CPPFLAGS = -MD -MP
-CXXFLAGS = -std=c++14 -Wall -Wno-unused-local-typedefs -Wno-unused-variable
+CXXFLAGS = -std=c++11 -Wall -Wno-unused-local-typedefs -Wno-unused-variable
 LDFLAGS = -pthread
 LDLIBS =
 
@@ -50,7 +50,7 @@ endif
 # automatic dependency generation for nvcc (gcc has it automated in the pre-processor phase with the -MD flag)
 # note that $@ is expanded only when $(CUDA_CPPFLAGS) is used
 CUDA_CPPFLAGS = --compiler-options -MD,-MP,-MT$@
-CUDA_CXXFLAGS = -std=c++14 --compiler-bindir $(CUDA_HOST_COMPILER)
+CUDA_CXXFLAGS = -std=c++11 --compiler-bindir $(CUDA_HOST_COMPILER)
 CUDA_LDLIBS =
 # disable false compiler warnings
 #   reference for the -Xcudafe flag: http://stackoverflow.com/questions/14831051/how-to-disable-compiler-warnings-with-nvcc/17095910#17095910
