@@ -13,7 +13,6 @@
 #pragma once
 
 #include <TNL/String.h>
-#include <TNL/param-types.h>
 #include <TNL/Meshes/Topologies/SubentityVertexMap.h>
 
 template< typename Cell,
@@ -32,17 +31,6 @@ struct FullConfig
 
    static constexpr int worldDimension = WorldDimension;
    static constexpr int meshDimension = Cell::dimension;
-
-   static TNL::String getType()
-   {
-      return TNL::String( "Meshes::FullConfig< " ) +
-             Cell::getType() + ", " +
-             TNL::String( WorldDimension ) + ", " +
-             TNL::getType< Real >() + ", " +
-             TNL::getType< GlobalIndex >() + ", " +
-             TNL::getType< LocalIndex >() + ", " +
-             TNL::getType< Id >() + " >";
-   }
 
    static TNL::String getConfigType()
    {
@@ -79,7 +67,7 @@ struct FullConfig
    template< typename EntityTopology >
    static constexpr bool subentityOrientationStorage( EntityTopology, int SubentityDimension )
    {
-       return false;
+      return false;
    }
 
    /****
@@ -97,7 +85,7 @@ struct FullConfig
    template< typename EntityTopology >
    static constexpr bool boundaryTagsStorage( EntityTopology )
    {
-       return true;
+      return true;
    }
 };
 
@@ -117,17 +105,6 @@ struct MinimalConfig
 
    static constexpr int worldDimension = WorldDimension;
    static constexpr int meshDimension = Cell::dimension;
-
-   static TNL::String getType()
-   {
-      return TNL::String( "Meshes::MinimalConfig< " ) +
-             Cell::getType() + ", " +
-             TNL::String( WorldDimension ) + ", " +
-             TNL::getType< Real >() + ", " +
-             TNL::getType< GlobalIndex >() + ", " +
-             TNL::getType< LocalIndex >() + ", " +
-             TNL::getType< Id >() + " >";
-   }
 
    static TNL::String getConfigType()
    {
@@ -168,7 +145,7 @@ struct MinimalConfig
    template< typename EntityTopology >
    static constexpr bool superentityStorage( EntityTopology, int SuperentityDimension )
    {
-       return ( EntityTopology::dimension == 0 || EntityTopology::dimension == meshDimension - 1 ) && SuperentityDimension == meshDimension;
+      return ( EntityTopology::dimension == 0 || EntityTopology::dimension == meshDimension - 1 ) && SuperentityDimension == meshDimension;
    }
 
    /****

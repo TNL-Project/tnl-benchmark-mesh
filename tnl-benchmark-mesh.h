@@ -16,13 +16,13 @@
 #include <TNL/Config/ParameterContainer.h>
 #include <TNL/Devices/Host.h>
 #include <TNL/Devices/Cuda.h>
-#include <TNL/Devices/CudaDeviceInfo.h>
+#include <TNL/Cuda/DeviceInfo.h>
 
 #include "MeshBenchmarks.h"
 
 using namespace TNL;
 using namespace TNL::Meshes;
-using namespace TNL::benchmarks;
+using namespace TNL::Benchmarks;
 
 template< typename CellTopology,
           int WorldDimension = CellTopology::dimension,
@@ -164,38 +164,7 @@ main( int argc, char* argv[] )
    Benchmark benchmark( loops, verbose );
 
    // prepare global metadata
-   const int cpu_id = 0;
-   Devices::CacheSizes cacheSizes = Devices::Host::getCPUCacheSizes( cpu_id );
-   String cacheInfo = String( cacheSizes.L1data ) + ", "
-                       + String( cacheSizes.L1instruction ) + ", "
-                       + String( cacheSizes.L2 ) + ", "
-                       + String( cacheSizes.L3 );
-#ifdef HAVE_CUDA
-   const int activeGPU = Devices::CudaDeviceInfo::getActiveDevice();
-   const String deviceArch = String( Devices::CudaDeviceInfo::getArchitectureMajor( activeGPU ) ) + "." +
-                             String( Devices::CudaDeviceInfo::getArchitectureMinor( activeGPU ) );
-#endif
-   Benchmark::MetadataMap metadata {
-       { "host name", Devices::Host::getHostname() },
-       { "architecture", Devices::Host::getArchitecture() },
-       { "system", Devices::Host::getSystemName() },
-       { "system release", Devices::Host::getSystemRelease() },
-       { "start time", Devices::Host::getCurrentTime() },
-       { "CPU model name", Devices::Host::getCPUModelName( cpu_id ) },
-       { "CPU cores", Devices::Host::getNumberOfCores( cpu_id ) },
-       { "CPU threads per core", Devices::Host::getNumberOfThreads( cpu_id ) / Devices::Host::getNumberOfCores( cpu_id ) },
-       { "CPU max frequency (MHz)", Devices::Host::getCPUMaxFrequency( cpu_id ) / 1e3 },
-       { "CPU cache sizes (L1d, L1i, L2, L3) (kiB)", cacheInfo },
-#ifdef HAVE_CUDA
-       { "GPU name", Devices::CudaDeviceInfo::getDeviceName( activeGPU ) },
-       { "GPU architecture", deviceArch },
-       { "GPU CUDA cores", Devices::CudaDeviceInfo::getCudaCores( activeGPU ) },
-       { "GPU clock rate (MHz)", (double) Devices::CudaDeviceInfo::getClockRate( activeGPU ) / 1e3 },
-       { "GPU global memory (GB)", (double) Devices::CudaDeviceInfo::getGlobalMemory( activeGPU ) / 1e9 },
-       { "GPU memory clock rate (MHz)", (double) Devices::CudaDeviceInfo::getMemoryClockRate( activeGPU ) / 1e3 },
-       { "GPU memory ECC enabled", Devices::CudaDeviceInfo::getECCEnabled( activeGPU ) },
-#endif
-   };
+   Benchmark::MetadataMap metadata = getHardwareMetadata();
 
    if( ! resolveCellTopology( benchmark, metadata, meshFile ) )
       return EXIT_FAILURE;

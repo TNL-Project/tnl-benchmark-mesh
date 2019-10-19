@@ -17,9 +17,11 @@
 #include <TNL/Meshes/Geometry/getEntityCenter.h>
 #include <TNL/Meshes/Geometry/getEntityMeasure.h>
 #include <TNL/Meshes/TypeResolver/TypeResolver.h>
-#include <TNL/DevicePointer.h>
-#include <TNL/ParallelFor.h>
-#include <TNL/StaticFor.h>
+#include <TNL/Pointers/DevicePointer.h>
+#include <TNL/Algorithms/ParallelFor.h>
+#include <TNL/Algorithms/TemplateStaticFor.h>
+#include <TNL/Benchmarks/Benchmarks.h>
+#include <TNL/Communicators/NoDistrCommunicator.h>
 
 #ifdef HAVE_CUDA
 #include <cuda_profiler_api.h>
@@ -28,11 +30,10 @@
 #include "MeshOrdering.h"
 
 #include "MeshConfigs.h"
-#include "tnl_benchmarks.h"
 
 using namespace TNL;
 using namespace TNL::Meshes;
-using namespace TNL::benchmarks;
+using namespace TNL::Benchmarks;
 
 template< typename Real >
 __cuda_callable__
@@ -72,7 +73,7 @@ struct MeshBenchmarks
       Benchmark::MetadataColumns metadataColumns = {
 //         {"mesh-file", meshFile},
          {"config", Mesh::Config::getConfigType()},
-         {"topology", Mesh::Config::CellTopology::getType().replace("Topologies::", "")},
+         {"topology", getType< typename Mesh::Config::CellTopology >().replace("Topologies::", "")},
 //         {"wrld dim", worldDimension},
          {"real", getType< typename Mesh::RealType >()},
          {"gid_t", getType< typename Mesh::GlobalIndexType >()},
@@ -82,7 +83,8 @@ struct MeshBenchmarks
       };
 
       Mesh mesh;
-      if( ! loadMesh( meshFile, mesh ) ) {
+      DistributedMeshes::DistributedMesh<Mesh> distributedMesh;
+      if( ! loadMesh< Communicators::NoDistrCommunicator >( meshFile, mesh, distributedMesh ) ) {
          std::cerr << "Failed to load mesh from file '" << meshFile << "'." << std::endl;
          return false;
       }
@@ -121,8 +123,8 @@ struct MeshBenchmarks
 
    static void dispatchAlgorithms( Benchmark & benchmark, const Mesh & mesh )
    {
-      StaticFor< int, 1, Mesh::getMeshDimension() + 1, CentersDispatch >::execHost( benchmark, mesh );
-      StaticFor< int, 1, Mesh::getMeshDimension() + 1, MeasuresDispatch >::execHost( benchmark, mesh );
+      Algorithms::TemplateStaticFor< int, 1, Mesh::getMeshDimension() + 1, CentersDispatch >::execHost( benchmark, mesh );
+      Algorithms::TemplateStaticFor< int, 1, Mesh::getMeshDimension() + 1, MeasuresDispatch >::execHost( benchmark, mesh );
       DualMeasuresDispatch::exec( benchmark, mesh );
       SpheresDispatch::exec( benchmark, mesh );
    }
@@ -134,7 +136,7 @@ struct MeshBenchmarks
                 typename = typename std::enable_if< M::template entitiesAvailable< EntityDimension >() >::type >
       static void exec( Benchmark & benchmark, const M & mesh )
       {
-         benchmark.setOperation( String("Centers (d = ") + String(EntityDimension) + ")" );
+         benchmark.setOperation( String("Centers (d = ") + convertToString(EntityDimension) + ")" );
          benchmark_centers< EntityDimension, Devices::Host >( benchmark, mesh );
 #ifdef HAVE_CUDA
          benchmark_centers< EntityDimension, Devices::Cuda >( benchmark, mesh );
@@ -156,7 +158,7 @@ struct MeshBenchmarks
                 typename = typename std::enable_if< M::template entitiesAvailable< EntityDimension >() >::type >
       static void exec( Benchmark & benchmark, const M & mesh )
       {
-         benchmark.setOperation( String("Measures (d = ") + String(EntityDimension) + ")" );
+         benchmark.setOperation( String("Measures (d = ") + convertToString(EntityDimension) + ")" );
          benchmark_measures< EntityDimension, Devices::Host >( benchmark, mesh );
 #ifdef HAVE_CUDA
          benchmark_measures< EntityDimension, Devices::Cuda >( benchmark, mesh );
@@ -238,9 +240,9 @@ struct MeshBenchmarks
       const Index entitiesCount = mesh_src.template getEntitiesCount< EntityDimension >();
 
       const DeviceMesh mesh = mesh_src;
-      DevicePointer< const DeviceMesh > meshPointer( mesh );
+      Pointers::DevicePointer< const DeviceMesh > meshPointer( mesh );
       Containers::Array< PointType, Device, Index > centers;
-      centers.setSize( PointType::size * entitiesCount );
+      centers.setSize( PointType::getSize() * entitiesCount );
 
       auto kernel_measures = [] __cuda_callable__
          ( Index i,
@@ -256,15 +258,16 @@ struct MeshBenchmarks
       };
 
       auto benchmark_func = [&] () {
-         ParallelFor< Device >::exec( (Index) 0, entitiesCount,
-                                      kernel_measures,
-                                      &meshPointer.template getData< Device >(),
-                                      centers.getData() );
+         Algorithms::ParallelFor< Device >::exec(
+               (Index) 0, entitiesCount,
+               kernel_measures,
+               &meshPointer.template getData< Device >(),
+               centers.getData() );
       };
 
-      benchmark.time( reset,
-                      (std::is_same< Device, Devices::Host >::value) ? "CPU" : "GPU",
-                      benchmark_func );
+      benchmark.time< Device >( reset,
+                                (std::is_same< Device, Devices::Host >::value) ? "CPU" : "GPU",
+                                benchmark_func );
    }
 
    template< int EntityDimension, typename Device >
@@ -277,7 +280,7 @@ struct MeshBenchmarks
       const Index entitiesCount = mesh_src.template getEntitiesCount< EntityDimension >();
 
       const DeviceMesh mesh = mesh_src;
-      DevicePointer< const DeviceMesh > meshPointer( mesh );
+      Pointers::DevicePointer< const DeviceMesh > meshPointer( mesh );
       Containers::Array< Real, Device, Index > measures;
       measures.setSize( entitiesCount );
 
@@ -295,15 +298,16 @@ struct MeshBenchmarks
       };
 
       auto benchmark_func = [&] () {
-         ParallelFor< Device >::exec( (Index) 0, entitiesCount,
-                                      kernel_measures,
-                                      &meshPointer.template getData< Device >(),
-                                      measures.getData() );
+         Algorithms::ParallelFor< Device >::exec(
+               (Index) 0, entitiesCount,
+               kernel_measures,
+               &meshPointer.template getData< Device >(),
+               measures.getData() );
       };
 
-      benchmark.time( reset,
-                      (std::is_same< Device, Devices::Host >::value) ? "CPU" : "GPU",
-                      benchmark_func );
+      benchmark.time< Device >( reset,
+                                (std::is_same< Device, Devices::Host >::value) ? "CPU" : "GPU",
+                                benchmark_func );
    }
 
    template< typename Device >
@@ -323,7 +327,7 @@ struct MeshBenchmarks
       const Index entitiesCount = mesh_src.template getEntitiesCount< Mesh::getMeshDimension() >();
 
       const DeviceMesh mesh = mesh_src;
-      DevicePointer< const DeviceMesh > meshPointer( mesh );
+      Pointers::DevicePointer< const DeviceMesh > meshPointer( mesh );
       Containers::Array< Real, Device, Index > measures;
       measures.setSize( entitiesCount );
 
@@ -360,15 +364,16 @@ struct MeshBenchmarks
       };
 
       auto benchmark_func = [&] () {
-         ParallelFor< Device >::exec( (Index) 0, entitiesCount,
-                                      kernel_measures,
-                                      &meshPointer.template getData< Device >(),
-                                      measures.getData() );
+         Algorithms::ParallelFor< Device >::exec(
+               (Index) 0, entitiesCount,
+               kernel_measures,
+               &meshPointer.template getData< Device >(),
+               measures.getData() );
       };
 
-      benchmark.time( reset,
-                      (std::is_same< Device, Devices::Host >::value) ? "CPU" : "GPU",
-                      benchmark_func );
+      benchmark.time< Device >( reset,
+                                (std::is_same< Device, Devices::Host >::value) ? "CPU" : "GPU",
+                                benchmark_func );
    }
 
    template< typename Device >
@@ -386,7 +391,7 @@ struct MeshBenchmarks
       const Index entitiesCount = mesh_src.template getEntitiesCount< 0 >();
 
       const DeviceMesh mesh = mesh_src;
-      DevicePointer< const DeviceMesh > meshPointer( mesh );
+      Pointers::DevicePointer< const DeviceMesh > meshPointer( mesh );
       Containers::Array< Real, Device, Index > spheres;
       spheres.setSize( entitiesCount );
 
@@ -452,15 +457,16 @@ struct MeshBenchmarks
       };
 
       auto benchmark_func = [&] () {
-         ParallelFor< Device >::exec( (Index) 0, entitiesCount,
-                                      kernel_spheres,
-                                      &meshPointer.template getData< Device >(),
-                                      spheres.getData() );
+         Algorithms::ParallelFor< Device >::exec(
+               (Index) 0, entitiesCount,
+               kernel_spheres,
+               &meshPointer.template getData< Device >(),
+               spheres.getData() );
       };
 
-      benchmark.time( reset,
-                      (std::is_same< Device, Devices::Host >::value) ? "CPU" : "GPU",
-                      benchmark_func );
+      benchmark.time< Device >( reset,
+                                (std::is_same< Device, Devices::Host >::value) ? "CPU" : "GPU",
+                                benchmark_func );
    }
 };
 

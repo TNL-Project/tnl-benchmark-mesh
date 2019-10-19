@@ -22,7 +22,10 @@ cuda: tnl-benchmark-mesh-cuda
 tnl-benchmark-mesh-cuda: tnl-benchmark-mesh-cuda.cu.o $(MESH_BENCHMARK_TEMPLATES_CU:%.cu=%.cu.o)
 	$(CUDA_COMPILER) $(CUDA_LDFLAGS) -o $@ $^ $(CUDA_LDLIBS)
 
-clean:
+clean: clean_templates
+.PHONY: clean_templates
+clean_templates:
+	$(RM) tnl-benchmark-mesh tnl-benchmark-mesh-cuda
 	$(RM) -r MeshBenchmarks.templates/
 
 -include $(SOURCES:%.cpp=%.d)

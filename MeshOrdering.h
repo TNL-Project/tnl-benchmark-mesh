@@ -27,7 +27,7 @@ struct KdTreeOrdering
         perm.setSize( numberOfEntities );
         iperm.setSize( numberOfEntities );
 
-        spatial::idle_point_multimap< PointType::size, PointType, IndexType > container;
+        spatial::idle_point_multimap< PointType::getSize(), PointType, IndexType > container;
 
         for( IndexType i = 0; i < numberOfEntities; i++ ) {
             const auto& entity = mesh.template getEntity< MeshEntity >( i );
@@ -312,11 +312,11 @@ public:
         Vector tmp;
         tmp.setLike( vector );
 
-        ParallelFor< Device >::exec( (IndexType) 0, vector.getSize(),
-                                     kernel,
-                                     vector.getData(),
-                                     tmp.getData(),
-                                     perm.getData() );
+        Algorithms::ParallelFor< Device >::exec( (IndexType) 0, vector.getSize(),
+                                                 kernel,
+                                                 vector.getData(),
+                                                 tmp.getData(),
+                                                 perm.getData() );
         vector = tmp;
     }
 
