@@ -12,8 +12,7 @@
 
 #pragma once
 
-#include <TNL/Config/ConfigDescription.h>
-#include <TNL/Config/ParameterContainer.h>
+#include <TNL/Config/parseCommandLine.h>
 #include <TNL/Devices/Host.h>
 #include <TNL/Devices/Cuda.h>
 #include <TNL/Cuda/DeviceInfo.h>
@@ -96,7 +95,7 @@ resolveCellTopology( Benchmark & benchmark,
       return false;
    }
 
-   using Readers::EntityShape;
+   using VTK::EntityShape;
    switch( reader.getCellShape() )
    {
       case EntityShape::Line:
@@ -110,7 +109,7 @@ resolveCellTopology( Benchmark & benchmark,
 //      case EntityShape::Hexahedron:
 //         return setMeshParameters< Topologies::Hexahedron >( benchmark, metadata, meshFile );
       default:
-         std::cerr << "unsupported cell topology: " << reader.getCellShape() << std::endl;
+         std::cerr << "unsupported cell topology: " << getShapeName(reader.getCellShape()) << std::endl;
          return false;
    }
 }
@@ -140,10 +139,8 @@ main( int argc, char* argv[] )
 
    setupConfig( conf_desc );
 
-   if( ! parseCommandLine( argc, argv, conf_desc, parameters ) ) {
-       conf_desc.printUsage( argv[ 0 ] );
+   if( ! parseCommandLine( argc, argv, conf_desc, parameters ) )
        return 1;
-   }
 
    Devices::Host::setup( parameters );
    Devices::Cuda::setup( parameters );

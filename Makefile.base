@@ -7,9 +7,9 @@
 # or from environment (e.g. TNL_CXX=clang++ make )
 # Note that we have to use TNL_CXX instead of CXX to set the default value,
 # because CXX is an implicit variable defined by GNU make itself. (Thank you!)
-TNL_CXX ?= clang++
+TNL_CXX ?= g++
 CXX := $(TNL_CXX)
-CUDA_COMPILER ?= clang++
+CUDA_COMPILER ?= nvcc
 CUDA_HOST_COMPILER ?= $(CXX)
 # BUILD can be 'Release' or 'Debug'
 BUILD ?= Release
@@ -33,9 +33,12 @@ endif
 
 ## essential host options
 CPPFLAGS = -MD -MP
-CXXFLAGS = -std=c++14 -Wall -Wno-unused-local-typedefs -Wno-unused-variable -Wno-deprecated
+CXXFLAGS = -std=c++14 -Wall -Wno-unused-local-typedefs -Wno-unused-variable  -Wno-deprecated -Wno-deprecated-declarations
 LDFLAGS = -pthread
 LDLIBS =
+ifneq ($(CXX),clang++)
+CXXFLAGS += -Wno-maybe-uninitialized
+endif
 
 ifeq ($(BUILD),Release)
 CXXFLAGS += -O3 -march=native -mtune=native -DNDEBUG
@@ -66,10 +69,12 @@ CUDA_LDLIBS =
 # disable false compiler warnings
 #   reference for the -Xcudafe flag: http://stackoverflow.com/questions/14831051/how-to-disable-compiler-warnings-with-nvcc/17095910#17095910
 #   list of possible tokens: http://www.ssl.berkeley.edu/~jimm/grizzly_docs/SSL/opt/intel/cc/9.0/lib/locale/en_US/mcpcom.msg
-CUDA_CXXFLAGS += --expt-relaxed-constexpr --expt-extended-lambda -Xcudafe "--diag_suppress=code_is_unreachable --diag_suppress=implicit_return_from_non_void_function --diag_suppress=unsigned_compare_with_zero"
+CUDA_CXXFLAGS += --expt-relaxed-constexpr --expt-extended-lambda -Xcudafe "--diag_suppress=code_is_unreachable --diag_suppress=implicit_return_from_non_void_function --diag_suppress=unsigned_compare_with_zero --display_error_number" -Xcompiler -Wno-vla
 # This diagnostic is just plain wrong in CUDA 9
 # See https://github.com/kokkos/kokkos/issues/1470
 CUDA_CXXFLAGS += -Xcudafe --diag_suppress=esa_on_defaulted_function_ignored
+# disable deprecation warnings
+CUDA_CXXFLAGS += -Xcudafe --diag_suppress=1444
 
 ifeq ($(BUILD),Release)
 CUDA_CXXFLAGS += -O3 -DNDEBUG -Xcompiler -march=native,-mtune=native
@@ -116,14 +121,14 @@ PKGS = tnl
 PKGS_CUDA = tnl-cuda
 CXXFLAGS += $(shell pkg-config --cflags $(PKGS))
 CUDA_CXXFLAGS += $(shell pkg-config --cflags $(PKGS_CUDA))
-ifeq ($(STATIC_LINKING),True)
-# hack because cmake does not support shared and static libraries with the same name
-LDLIBS += $(subst tnl,tnl_static,$(shell pkg-config --libs $(PKGS)))
-CUDA_LDLIBS += $(subst tnl,tnl-cuda_static,$(shell pkg-config --libs $(PKGS_CUDA)))
-else
-LDLIBS += $(shell pkg-config --libs $(PKGS))
-CUDA_LDLIBS += $(shell pkg-config --libs $(PKGS_CUDA))
-endif
+#ifeq ($(STATIC_LINKING),True)
+## hack because cmake does not support shared and static libraries with the same name
+#LDLIBS += $(subst tnl,tnl_static,$(shell pkg-config --libs $(PKGS)))
+#CUDA_LDLIBS += $(subst tnl,tnl-cuda_static,$(shell pkg-config --libs $(PKGS_CUDA)))
+#else
+#LDLIBS += $(shell pkg-config --libs $(PKGS))
+#CUDA_LDLIBS += $(shell pkg-config --libs $(PKGS_CUDA))
+#endif
 
 # OpenMP
 ifeq ($(CXX),clang++)
@@ -138,7 +143,12 @@ endif
 ## static linking flags
 ifeq ($(STATIC_LINKING),True)
 LDFLAGS += -static
+ifeq ($(CUDA_COMPILER),nvcc)
+# FIXME: does not work: /usr/bin/ld: cannot find -lgcc_s
+CUDA_LDFLAGS += -Xlinker -static
+else
 CUDA_LDFLAGS += -static
+endif
 # GOTCHA: the order of -l flags matters, -ldl should be specified last since other libs often depend on it
 LDLIBS += -ldl
 ifneq ($(CUDA_COMPILER),clang++)
