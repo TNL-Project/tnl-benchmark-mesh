@@ -337,7 +337,8 @@ struct MeshBenchmarks
            Real* array )
       {
          const auto& entity = mesh->template getEntity< Mesh::getMeshDimension() >( i );
-         constexpr auto facesCount = Mesh::Cell::template getSubentitiesCount< Mesh::getMeshDimension() - 1 >();
+//         constexpr auto facesCount = Mesh::Cell::template getSubentitiesCount< Mesh::getMeshDimension() - 1 >();
+         constexpr auto facesCount = Mesh::Cell::template SubentityTraits< Mesh::getMeshDimension() - 1 >::count;
          PointType centers[ facesCount ];
 
          for( LocalIndex f = 0; f < facesCount; f++ ) {
@@ -395,24 +396,26 @@ struct MeshBenchmarks
       Containers::Array< Real, Device, Index > spheres;
       spheres.setSize( entitiesCount );
 
-      auto hasSubvertex = [] __cuda_callable__
-         ( const typename DeviceMesh::Face & face,
-           const Index i )
-      {
-         constexpr auto verticesCount = Mesh::Face::template getSubentitiesCount< 0 >();
-         for( LocalIndex v = 0; v < verticesCount; v++ ) {
-            const auto vid = face.template getSubentityIndex< 0 >( v );
-            if( vid == i )
-               return true;
-         }
-         return false;
-      };
+//      auto hasSubvertex = [] __cuda_callable__
+//         ( const typename DeviceMesh::Face & face,
+//           const Index i )
+//      {
+////         constexpr auto verticesCount = Mesh::Face::template getSubentitiesCount< 0 >();
+//         constexpr auto verticesCount = Mesh::Face::template SubentityTraits< 0 >::count;
+//         for( LocalIndex v = 0; v < verticesCount; v++ ) {
+//            const auto vid = face.template getSubentityIndex< 0 >( v );
+//            if( vid == i )
+//               return true;
+//         }
+//         return false;
+//      };
 
       auto getLocalVertexIndex = [] __cuda_callable__
          ( const typename DeviceMesh::Cell & cell,
            const Index i )
       {
-         constexpr auto verticesCount = Mesh::Cell::template getSubentitiesCount< 0 >();
+//         constexpr auto verticesCount = Mesh::Cell::template getSubentitiesCount< 0 >();
+         constexpr auto verticesCount = Mesh::Cell::template SubentityTraits< 0 >::count;
          for( LocalIndex v = 0; v < verticesCount; v++ ) {
             const auto vid = cell.template getSubentityIndex< 0 >( v );
             if( vid == i ) {
@@ -436,7 +439,8 @@ struct MeshBenchmarks
             const auto cid = vertex.template getSuperentityIndex< Mesh::getMeshDimension() >( c );
             const auto& cell = mesh->template getEntity< Mesh::getMeshDimension() >( cid );
             // general version, but very slow
-//            constexpr auto facesCount = Mesh::Cell::template getSubentitiesCount< Mesh::getMeshDimension() - 1 >();
+////            constexpr auto facesCount = Mesh::Cell::template getSubentitiesCount< Mesh::getMeshDimension() - 1 >();
+//            constexpr auto facesCount = Mesh::Cell::template SubentityTraits< Mesh::getMeshDimension() - 1 >::count;
 //            for( LocalIndex f = 0; f < facesCount; f++ ) {
 //               const auto fid = cell.template getSubentityIndex< Mesh::getMeshDimension() - 1 >( f );
 //               const auto& face = mesh->template getEntity< Mesh::getMeshDimension() - 1 >( fid );
