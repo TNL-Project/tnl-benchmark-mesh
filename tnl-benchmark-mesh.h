@@ -87,9 +87,8 @@ resolveCellTopology( Benchmark & benchmark,
 {
    benchmark.newBenchmark( meshFile, metadata );
 
-   Readers::VTKReader reader;
-   if( ! reader.detectMesh( meshFile ) )
-      return false;
+   Readers::VTKReader reader( meshFile );
+   reader.detectMesh();
    if( reader.getMeshType() != "Meshes::Mesh" ) {
       std::cerr << "The mesh type " << reader.getMeshType() << " is not supported in the VTK reader." << std::endl;
       return false;

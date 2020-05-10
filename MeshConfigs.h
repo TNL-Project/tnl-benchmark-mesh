@@ -80,13 +80,29 @@ struct FullConfig
    }
 
    /****
-    * Storage of boundary tags of mesh entities. Necessary for the mesh traverser.
+    * Storage of mesh entity tags. Boundary tags are necessary for the mesh traverser.
     */
    template< typename EntityTopology >
-   static constexpr bool boundaryTagsStorage( EntityTopology )
+   static constexpr bool entityTagsStorage( EntityTopology )
    {
       return true;
    }
+
+   /****
+    * Storage of the dual graph.
+    *
+    * If enabled, links from vertices to cells must be stored.
+    */
+   static constexpr bool dualGraphStorage()
+   {
+      return true;
+   }
+
+   /****
+    * Cells must have at least this number of common vertices to be considered
+    * as neighbors in the dual graph.
+    */
+   static constexpr int dualGraphMinCommonVertices = meshDimension;
 };
 
 template< typename Cell,
@@ -149,11 +165,27 @@ struct MinimalConfig
    }
 
    /****
-    * Storage of boundary tags of mesh entities. Necessary for the mesh traverser.
+    * Storage of mesh entity tags. Boundary tags are necessary for the mesh traverser.
     */
    template< typename EntityTopology >
-   static constexpr bool boundaryTagsStorage( EntityTopology )
+   static constexpr bool entityTagsStorage( EntityTopology )
    {
       return false;
    }
+
+   /****
+    * Storage of the dual graph.
+    *
+    * If enabled, links from vertices to cells must be stored.
+    */
+   static constexpr bool dualGraphStorage()
+   {
+      return true;
+   }
+
+   /****
+    * Cells must have at least this number of common vertices to be considered
+    * as neighbors in the dual graph.
+    */
+   static constexpr int dualGraphMinCommonVertices = meshDimension;
 };

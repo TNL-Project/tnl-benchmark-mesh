@@ -35,7 +35,7 @@ endif
 CPPFLAGS = -MD -MP
 CXXFLAGS = -std=c++14 -Wall -Wno-unused-local-typedefs -Wno-unused-variable  -Wno-deprecated -Wno-deprecated-declarations
 LDFLAGS = -pthread
-LDLIBS =
+LDLIBS = -lstdc++fs
 ifneq ($(CXX),clang++)
 CXXFLAGS += -Wno-maybe-uninitialized
 endif
@@ -65,7 +65,7 @@ endif
 # note that $@ is expanded only when $(CUDA_CPPFLAGS) is used
 CUDA_CPPFLAGS = --compiler-options -MD,-MP,-MT$@
 CUDA_CXXFLAGS = -std=c++14 --compiler-bindir $(CUDA_HOST_COMPILER)
-CUDA_LDLIBS =
+CUDA_LDLIBS = -lstdc++fs
 # disable false compiler warnings
 #   reference for the -Xcudafe flag: http://stackoverflow.com/questions/14831051/how-to-disable-compiler-warnings-with-nvcc/17095910#17095910
 #   list of possible tokens: http://www.ssl.berkeley.edu/~jimm/grizzly_docs/SSL/opt/intel/cc/9.0/lib/locale/en_US/mcpcom.msg

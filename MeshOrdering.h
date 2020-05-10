@@ -2,22 +2,19 @@
 
 #include <TNL/Meshes/Mesh.h>
 
-#include <boost/graph/adjacency_list.hpp>
-#include <boost/graph/cuthill_mckee_ordering.hpp>
-
 #include "libs/spatial/src/idle_point_multimap.hpp"
 
 struct KdTreeOrdering
 {
     // implementation for Mesh and Grid on host
-    template< typename MeshEntity, typename Mesh, typename PermutationVector >
+    template< typename MeshEntity, typename Mesh, typename PermutationArray >
     static void
     getPermutations( const Mesh& mesh,
-                     PermutationVector& perm,
-                     PermutationVector& iperm )
+                     PermutationArray& perm,
+                     PermutationArray& iperm )
     {
         static_assert( std::is_same< typename Mesh::DeviceType, TNL::Devices::Host >::value, "" );
-        static_assert( std::is_same< typename PermutationVector::DeviceType, TNL::Devices::Host >::value, "" );
+        static_assert( std::is_same< typename PermutationArray::DeviceType, TNL::Devices::Host >::value, "" );
         using IndexType = typename Mesh::GlobalIndexType;
         using PointType = typename Mesh::PointType;
 
@@ -51,19 +48,17 @@ struct KdTreeOrdering
     }
 };
 
-// interface for the boost implementation of the Cuthill-McKee ordering method
-// http://www.boost.org/doc/libs/1_64_0/libs/graph/doc/cuthill_mckee_ordering.html
 template< bool reverse = true >
 struct CuthillMcKeeOrdering
 {
-    template< typename MeshEntity, typename Mesh, typename PermutationVector >
+    template< typename MeshEntity, typename Mesh, typename PermutationArray >
     static void
     getPermutations( const Mesh& mesh,
-                     PermutationVector& perm,
-                     PermutationVector& iperm )
+                     PermutationArray& perm,
+                     PermutationArray& iperm )
     {
         static_assert( std::is_same< typename Mesh::DeviceType, TNL::Devices::Host >::value, "" );
-        static_assert( std::is_same< typename PermutationVector::DeviceType, TNL::Devices::Host >::value, "" );
+        static_assert( std::is_same< typename PermutationArray::DeviceType, TNL::Devices::Host >::value, "" );
 
         // The reverse Cuthill-McKee ordering is implemented only for cells,
         // other entities are ordered from the current order of cells exactly
@@ -77,10 +72,10 @@ private:
               bool is_cell = MeshEntity::getEntityDimension() == Mesh::getMeshDimension() >
     struct Wrapper
     {
-        template< typename PermutationVector >
+        template< typename PermutationArray >
         static void getPermutations( const Mesh& mesh,
-                                     PermutationVector& perm,
-                                     PermutationVector& iperm )
+                                     PermutationArray& perm,
+                                     PermutationArray& iperm )
         {
             reorderCells( mesh, perm, iperm );
         }
@@ -90,10 +85,10 @@ private:
               typename Mesh >
     struct Wrapper< MeshEntity, Mesh, false >
     {
-        template< typename PermutationVector >
+        template< typename PermutationArray >
         static void getPermutations( const Mesh& mesh,
-                                     PermutationVector& perm,
-                                     PermutationVector& iperm )
+                                     PermutationArray& perm,
+                                     PermutationArray& iperm )
         {
             reorderEntities< MeshEntity >( mesh, perm, iperm );
         }
@@ -107,10 +102,10 @@ private:
               typename Index >
     struct Wrapper< MeshEntity, TNL::Meshes::Grid< Dimension, Real, Device, Index >, true >
     {
-        template< typename PermutationVector >
+        template< typename PermutationArray >
         static void getPermutations( const TNL::Meshes::Grid< Dimension, Real, Device, Index >& mesh,
-                                     PermutationVector& perm,
-                                     PermutationVector& iperm )
+                                     PermutationArray& perm,
+                                     PermutationArray& iperm )
         {
             std::cerr << "CuthillMcKeeOrdering is not implemented for grids." << std::endl;
             throw 1;
@@ -125,21 +120,21 @@ private:
               typename Index >
     struct Wrapper< MeshEntity, TNL::Meshes::Grid< Dimension, Real, Device, Index >, false >
     {
-        template< typename PermutationVector >
+        template< typename PermutationArray >
         static void getPermutations( const TNL::Meshes::Grid< Dimension, Real, Device, Index >& mesh,
-                                     PermutationVector& perm,
-                                     PermutationVector& iperm )
+                                     PermutationArray& perm,
+                                     PermutationArray& iperm )
         {
             std::cerr << "CuthillMcKeeOrdering is not implemented for grids." << std::endl;
             throw 1;
         }
     };
 
-    template< typename Mesh, typename PermutationVector >
+    template< typename Mesh, typename PermutationArray >
     static void
     reorderCells( const Mesh& mesh,
-                  PermutationVector& perm,
-                  PermutationVector& iperm )
+                  PermutationArray& perm,
+                  PermutationArray& iperm )
     {
         using IndexType = typename Mesh::GlobalIndexType;
         const IndexType numberOfCells = mesh.template getEntitiesCount< typename Mesh::Cell >();
@@ -148,50 +143,72 @@ private:
         perm.setSize( numberOfCells );
         iperm.setSize( numberOfCells );
 
-        using Graph = boost::adjacency_list< boost::vecS, boost::vecS, boost::undirectedS,
-                                boost::property< boost::vertex_color_t, boost::default_color_type,
-                                boost::property< boost::vertex_degree_t, int > > >;
-        using GraphVertex = boost::graph_traits< Graph >::vertex_descriptor;
-        using GraphSizeType = boost::graph_traits< Graph >::vertices_size_type;
+        // vector view for the neighbor counts
+        const auto neighborCounts = mesh.getNeighborCounts().getConstView();
 
-        Graph G( numberOfCells );
-        for( IndexType K = 0; K < numberOfCells; K++ ) {
-            const auto& cell = mesh.template getEntity< Mesh::getMeshDimension() >( K );
-            for( typename Mesh::LocalIndexType f = 0; f < cell.template getSubentitiesCount< Mesh::getMeshDimension() - 1 >(); f++ ) {
-                const auto F = cell.template getSubentityIndex< Mesh::getMeshDimension() - 1 >( f );
-                const auto& face = mesh.template getEntity< Mesh::getMeshDimension() - 1 >( F );
-                for( typename Mesh::LocalIndexType c = 0; c < face.template getSuperentitiesCount< Mesh::getMeshDimension() >(); c++ ) {
-                    const auto cellIndex = face.template getSuperentityIndex< Mesh::getMeshDimension() >( c );
-                    if( cellIndex != K ) {
-                        boost::add_edge( K, cellIndex, G );
-                        break;
-                    }
+        // worker array - marker for inserted elements
+        TNL::Containers::Array< bool, TNL::Devices::Host, IndexType > marker( numberOfCells );
+        marker.setValue( false );
+        // worker vector for collecting neighbors
+        std::vector< IndexType > neighbors;
+
+        // comparator functor
+        auto comparator = [&] ( IndexType a, IndexType b )
+        {
+            return neighborCounts[ a ] < neighborCounts[ b ];
+        };
+
+        // counter for assigning indices
+        IndexType permIndex = 0;
+
+        // modifier for the reversed variant
+        auto mod = [numberOfCells] ( IndexType i )
+        {
+            if( reverse )
+                return numberOfCells - 1 - i;
+            else
+                return i;
+        };
+
+        // start with a peripheral node
+        const IndexType peripheral = argMin( neighborCounts ).first;
+        perm[ mod(permIndex) ] = peripheral;
+        iperm[ peripheral ] = mod(permIndex);
+        permIndex++;
+        marker[ peripheral ] = true;
+
+        // Cuthill--McKee
+        IndexType i = 0;
+        while( permIndex < numberOfCells ) {
+            const IndexType k = perm[ mod(i) ];
+            // collect all neighbors which were not marked yet
+            const IndexType count = neighborCounts[ k ];
+            for( IndexType n = 0; n < count; n++ ) {
+                const IndexType nk = mesh.getCellNeighborIndex( k, n );
+                if( marker[ nk ] == false ) {
+                    neighbors.push_back( nk );
+                    marker[ nk ] = true;
                 }
             }
-        }
-
-        boost::property_map< Graph, boost::vertex_index_t >::type
-            index_map = get( boost::vertex_index, G );
-
-        std::vector< GraphVertex > graphVertexInvPerm( boost::num_vertices( G ) );
-        if( reverse )
-            boost::cuthill_mckee_ordering( G, graphVertexInvPerm.rbegin(), get( boost::vertex_color, G ), boost::make_degree_map( G ) );
-        else
-            boost::cuthill_mckee_ordering( G, graphVertexInvPerm.begin(), get( boost::vertex_color, G ), boost::make_degree_map( G ) );
-
-        IndexType permIndex = 0;
-        for( auto i : graphVertexInvPerm ) {
-            perm[ permIndex ] = index_map[ i ];
-            iperm[ index_map[ i ] ] = permIndex;
-            permIndex++;
+            // sort collected neighbors with ascending neighbors count
+            std::sort( neighbors.begin(), neighbors.end(), comparator );
+            // assign an index to the neighbors in this order
+            for( auto nk : neighbors ) {
+                perm[ mod(permIndex) ] = nk;
+                iperm[ nk ] = mod(permIndex);
+                permIndex++;
+            }
+            // next iteration
+            i++;
+            neighbors.clear();
         }
     }
 
-    template< typename MeshEntity, typename Mesh, typename PermutationVector >
+    template< typename MeshEntity, typename Mesh, typename PermutationArray >
     static void
     reorderEntities( const Mesh& mesh,
-                     PermutationVector& perm,
-                     PermutationVector& iperm )
+                     PermutationArray& perm,
+                     PermutationArray& iperm )
     {
         using IndexType = typename Mesh::GlobalIndexType;
         const IndexType numberOfEntities = mesh.template getEntitiesCount< MeshEntity >();
@@ -201,14 +218,17 @@ private:
         perm.setSize( numberOfEntities );
         iperm.setSize( numberOfEntities );
 
-        std::unordered_set< IndexType > numberedEntities;
+        // worker array - marker for numbered entities
+        TNL::Containers::Array< bool, TNL::Devices::Host, IndexType > marker( numberOfEntities );
+        marker.setValue( false );
+
         IndexType permIndex = 0;
         for( IndexType K = 0; K < numberOfCells; K++ ) {
             const auto& cell = mesh.template getEntity< Mesh::getMeshDimension() >( K );
             for( typename Mesh::LocalIndexType e = 0; e < cell.template getSubentitiesCount< MeshEntity::getEntityDimension() >(); e++ ) {
                 const auto E = cell.template getSubentityIndex< MeshEntity::getEntityDimension() >( e );
-                if( numberedEntities.count( E ) == 0 ) {
-                    numberedEntities.insert( E );
+                if( marker[ E ] == false ) {
+                    marker[ E ] = true;
                     perm[ permIndex ] = E;
                     iperm[ E ] = permIndex;
                     permIndex++;
@@ -222,14 +242,14 @@ private:
 template< typename Ordering, typename Device >
 struct MeshOrderingDeviceWrapper
 {
-    template< typename MeshEntity, typename MeshConfig, typename PermutationVector >
+    template< typename MeshEntity, typename MeshConfig, typename PermutationArray >
     static void
     getPermutations( const TNL::Meshes::Mesh< MeshConfig, Device >& mesh,
-                     PermutationVector& perm,
-                     PermutationVector& iperm )
+                     PermutationArray& perm,
+                     PermutationArray& iperm )
     {
         using MeshHost = TNL::Meshes::Mesh< MeshConfig, TNL::Devices::Host >;
-        using PermutationHost = typename PermutationVector::HostType;
+        using PermutationHost = typename PermutationArray::template Self< typename PermutationArray::ValueType, TNL::Devices::Host >;
         using MeshHostEntity = typename MeshHost::template EntityType< MeshEntity::getEntityDimension() >;
 
         const MeshHost meshHost = mesh;
@@ -245,11 +265,11 @@ struct MeshOrderingDeviceWrapper
 template< typename Ordering >
 struct MeshOrderingDeviceWrapper< Ordering, TNL::Devices::Host >
 {
-    template< typename MeshEntity, typename MeshConfig, typename PermutationVector >
+    template< typename MeshEntity, typename MeshConfig, typename PermutationArray >
     static void
     getPermutations( const TNL::Meshes::Mesh< MeshConfig, TNL::Devices::Host >& mesh,
-                     PermutationVector& perm,
-                     PermutationVector& iperm )
+                     PermutationArray& perm,
+                     PermutationArray& iperm )
     {
         Ordering::template getPermutations< MeshEntity >( mesh, perm, iperm );
     }
@@ -280,36 +300,38 @@ template< typename MeshConfig, typename Device, typename OrderingMethod >
 class MeshOrdering< TNL::Meshes::Mesh< MeshConfig, Device >, OrderingMethod >
 {
     using Mesh = TNL::Meshes::Mesh< MeshConfig, Device >;
-    using PermutationVector = typename Mesh::GlobalIndexVector;
+    using PermutationArray = typename Mesh::GlobalIndexArray;
     using Ordering = MeshOrderingDeviceWrapper< OrderingMethod, Device >;
 
-    PermutationVector perm_vertices, iperm_vertices, perm_faces, iperm_faces, perm_cells, iperm_cells;
+    PermutationArray perm_vertices, iperm_vertices, perm_faces, iperm_faces, perm_cells, iperm_cells;
 
 // nvcc does not allow __cuda_callable__ lambdas inside private or protected sections
 #ifdef __NVCC__
 public:
 #endif
-    template< typename Vector >
-    static void _reorder_vector( Vector& vector, const PermutationVector& perm )
+    template< typename VectorOrView >
+    static void _reorder_vector( VectorOrView& vector, const PermutationArray& perm )
     {
-        static_assert( std::is_same< typename Vector::DeviceType, Device >::value, "The vector must live on the same device as the mesh." );
+        static_assert( std::is_same< typename VectorOrView::DeviceType, Device >::value, "The vector must live on the same device as the mesh." );
         TNL_ASSERT( vector.getSize() == perm.getSize(),
                     std::cerr << "Mismatched sizes of `vector` and `perm` (" << vector.getSize()
                               << " vs. " << perm.getSize() << ")." << std::endl; );
         using namespace TNL;
-        using IndexType = typename Vector::IndexType;
-        using RealType = decltype(vector.getElement(0));
+        using ValueType = typename VectorOrView::ValueType;
+        using DeviceType = typename VectorOrView::DeviceType;
+        using IndexType = typename VectorOrView::IndexType;
+        using Array = Containers::Array< ValueType, DeviceType, IndexType >;
 
         auto kernel = [] __cuda_callable__
            ( IndexType i,
-             const RealType* src,
-             RealType* dest,
-             const typename PermutationVector::RealType* perm )
+             const ValueType* src,
+             ValueType* dest,
+             const typename PermutationArray::ValueType* perm )
         {
             dest[ i ] = src[ perm[ i ] ];
         };
 
-        Vector tmp;
+        Array tmp;
         tmp.setLike( vector );
 
         Algorithms::ParallelFor< Device >::exec( (IndexType) 0, vector.getSize(),
@@ -321,7 +343,7 @@ public:
     }
 
     template< typename Matrix >
-    static void _reorder_matrix( const Matrix& matrix1, Matrix& matrix2, const PermutationVector& _perm, const PermutationVector& _iperm )
+    static void _reorder_matrix( const Matrix& matrix1, Matrix& matrix2, const PermutationArray& _perm, const PermutationArray& _iperm )
     {
         // TODO: implement on GPU
         static_assert( std::is_same< typename Matrix::DeviceType, TNL::Devices::Host >::value, "matrix reordering is implemented only for host" );
@@ -379,8 +401,11 @@ public:
             IndexType indices[ rowLength ];
             for( IndexType j = 0; j < rowLength; j++ )
                 indices[ j ] = j;
-            auto comparator = [&]( IndexType a, IndexType b ) {
-                return columns[ a ] < columns[ b ];
+            // nvcc does not allow lambdas to capture VLAs, even in host code (WTF!?)
+            //    error: a variable captured by a lambda cannot have a type involving a variable-length array
+            IndexType* _columns = columns;
+            auto comparator = [=]( IndexType a, IndexType b ) {
+                return _columns[ a ] < _columns[ b ];
             };
             std::sort( indices, indices + rowLength, comparator );
 

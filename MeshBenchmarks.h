@@ -21,7 +21,6 @@
 #include <TNL/Algorithms/ParallelFor.h>
 #include <TNL/Algorithms/TemplateStaticFor.h>
 #include <TNL/Benchmarks/Benchmarks.h>
-#include <TNL/Communicators/NoDistrCommunicator.h>
 
 #ifdef HAVE_CUDA
 #include <cuda_profiler_api.h>
@@ -83,8 +82,7 @@ struct MeshBenchmarks
       };
 
       Mesh mesh;
-      DistributedMeshes::DistributedMesh<Mesh> distributedMesh;
-      if( ! loadMesh< Communicators::NoDistrCommunicator >( meshFile, mesh, distributedMesh ) ) {
+      if( ! loadMesh( mesh, meshFile ) ) {
          std::cerr << "Failed to load mesh from file '" << meshFile << "'." << std::endl;
          return false;
       }
@@ -133,7 +131,7 @@ struct MeshBenchmarks
    struct CentersDispatch
    {
       template< typename M,
-                typename = typename std::enable_if< M::template entitiesAvailable< EntityDimension >() >::type >
+                typename = typename std::enable_if< M::Config::entityStorage( EntityDimension ) >::type >
       static void exec( Benchmark & benchmark, const M & mesh )
       {
          benchmark.setOperation( String("Centers (d = ") + convertToString(EntityDimension) + ")" );
@@ -144,7 +142,7 @@ struct MeshBenchmarks
       }
 
       template< typename M,
-                typename = typename std::enable_if< ! M::template entitiesAvailable< EntityDimension >() >::type,
+                typename = typename std::enable_if< ! M::Config::entityStorage( EntityDimension ) >::type,
                 typename = void >
       static void exec( Benchmark & benchmark, const M & mesh )
       {
@@ -155,7 +153,7 @@ struct MeshBenchmarks
    struct MeasuresDispatch
    {
       template< typename M,
-                typename = typename std::enable_if< M::template entitiesAvailable< EntityDimension >() >::type >
+                typename = typename std::enable_if< M::Config::entityStorage( EntityDimension ) >::type >
       static void exec( Benchmark & benchmark, const M & mesh )
       {
          benchmark.setOperation( String("Measures (d = ") + convertToString(EntityDimension) + ")" );
@@ -166,7 +164,7 @@ struct MeshBenchmarks
       }
 
       template< typename M,
-                typename = typename std::enable_if< ! M::template entitiesAvailable< EntityDimension >() >::type,
+                typename = typename std::enable_if< ! M::Config::entityStorage( EntityDimension ) >::type,
                 typename = void >
       static void exec( Benchmark & benchmark, const M & mesh )
       {
