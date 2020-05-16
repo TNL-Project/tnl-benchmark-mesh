@@ -69,7 +69,7 @@ CUDA_LDLIBS = -lstdc++fs
 # disable false compiler warnings
 #   reference for the -Xcudafe flag: http://stackoverflow.com/questions/14831051/how-to-disable-compiler-warnings-with-nvcc/17095910#17095910
 #   list of possible tokens: http://www.ssl.berkeley.edu/~jimm/grizzly_docs/SSL/opt/intel/cc/9.0/lib/locale/en_US/mcpcom.msg
-CUDA_CXXFLAGS += --expt-relaxed-constexpr --expt-extended-lambda -Xcudafe "--diag_suppress=code_is_unreachable --diag_suppress=implicit_return_from_non_void_function --diag_suppress=unsigned_compare_with_zero --display_error_number" -Xcompiler -Wno-vla
+CUDA_CXXFLAGS += --expt-relaxed-constexpr --expt-extended-lambda -Xcudafe "--diag_suppress=code_is_unreachable --diag_suppress=loop_not_reachable --diag_suppress=implicit_return_from_non_void_function --diag_suppress=unsigned_compare_with_zero --display_error_number" -Xcompiler -Wno-vla
 # This diagnostic is just plain wrong in CUDA 9
 # See https://github.com/kokkos/kokkos/issues/1470
 CUDA_CXXFLAGS += -Xcudafe --diag_suppress=esa_on_defaulted_function_ignored
