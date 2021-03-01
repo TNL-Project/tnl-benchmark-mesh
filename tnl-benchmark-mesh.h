@@ -29,54 +29,22 @@ template< typename CellTopology,
 bool
 setMeshParameters( Params&&... params )
 {
-   bool status = MeshBenchmarksRunner< MinimalConfig, CellTopology, WorldDimension, float, int, short int, void >::run( std::forward<Params>(params)... ) &&
-//                 MeshBenchmarksRunner< MinimalConfig, CellTopology, WorldDimension, float, int, short int, int >::run( std::forward<Params>(params)... ) &&
-//                 MeshBenchmarksRunner< MinimalConfig, CellTopology, WorldDimension, float, int, short int, long int >::run( std::forward<Params>(params)... ) &&
-                 MeshBenchmarksRunner< MinimalConfig, CellTopology, WorldDimension, float, int, int, void >::run( std::forward<Params>(params)... ) &&
-//                 MeshBenchmarksRunner< MinimalConfig, CellTopology, WorldDimension, float, int, int, int >::run( std::forward<Params>(params)... ) &&
-//                 MeshBenchmarksRunner< MinimalConfig, CellTopology, WorldDimension, float, int, int, long int >::run( std::forward<Params>(params)... ) &&
-                 MeshBenchmarksRunner< MinimalConfig, CellTopology, WorldDimension, float, long int, short int, void >::run( std::forward<Params>(params)... ) &&
-//                 MeshBenchmarksRunner< MinimalConfig, CellTopology, WorldDimension, float, long int, short int, int >::run( std::forward<Params>(params)... ) &&
-//                 MeshBenchmarksRunner< MinimalConfig, CellTopology, WorldDimension, float, long int, short int, long int >::run( std::forward<Params>(params)... ) &&
-                 MeshBenchmarksRunner< MinimalConfig, CellTopology, WorldDimension, float, long int, int, void >::run( std::forward<Params>(params)... ) &&
-//                 MeshBenchmarksRunner< MinimalConfig, CellTopology, WorldDimension, float, long int, int, int >::run( std::forward<Params>(params)... ) &&
-//                 MeshBenchmarksRunner< MinimalConfig, CellTopology, WorldDimension, float, long int, int, long int >::run( std::forward<Params>(params)... ) &&
-                 MeshBenchmarksRunner< MinimalConfig, CellTopology, WorldDimension, double, int, short int, void >::run( std::forward<Params>(params)... ) &&
-//                 MeshBenchmarksRunner< MinimalConfig, CellTopology, WorldDimension, double, int, short int, int >::run( std::forward<Params>(params)... ) &&
-//                 MeshBenchmarksRunner< MinimalConfig, CellTopology, WorldDimension, double, int, short int, long int >::run( std::forward<Params>(params)... ) &&
-                 MeshBenchmarksRunner< MinimalConfig, CellTopology, WorldDimension, double, int, int, void >::run( std::forward<Params>(params)... ) &&
-//                 MeshBenchmarksRunner< MinimalConfig, CellTopology, WorldDimension, double, int, int, int >::run( std::forward<Params>(params)... ) &&
-//                 MeshBenchmarksRunner< MinimalConfig, CellTopology, WorldDimension, double, int, int, long int >::run( std::forward<Params>(params)... ) &&
-                 MeshBenchmarksRunner< MinimalConfig, CellTopology, WorldDimension, double, long int, short int, void >::run( std::forward<Params>(params)... ) &&
-//                 MeshBenchmarksRunner< MinimalConfig, CellTopology, WorldDimension, double, long int, short int, int >::run( std::forward<Params>(params)... ) &&
-//                 MeshBenchmarksRunner< MinimalConfig, CellTopology, WorldDimension, double, long int, short int, long int >::run( std::forward<Params>(params)... ) &&
-                 MeshBenchmarksRunner< MinimalConfig, CellTopology, WorldDimension, double, long int, int, void >::run( std::forward<Params>(params)... ) &&
-//                 MeshBenchmarksRunner< MinimalConfig, CellTopology, WorldDimension, double, long int, int, int >::run( std::forward<Params>(params)... ) &&
-//                 MeshBenchmarksRunner< MinimalConfig, CellTopology, WorldDimension, double, long int, int, long int >::run( std::forward<Params>(params)... ) &&
-                 MeshBenchmarksRunner< FullConfig, CellTopology, WorldDimension, float, int, short int, void >::run( std::forward<Params>(params)... ) &&
-//                 MeshBenchmarksRunner< FullConfig, CellTopology, WorldDimension, float, int, short int, int >::run( std::forward<Params>(params)... ) &&
-//                 MeshBenchmarksRunner< FullConfig, CellTopology, WorldDimension, float, int, short int, long int >::run( std::forward<Params>(params)... ) &&
-                 MeshBenchmarksRunner< FullConfig, CellTopology, WorldDimension, float, int, int, void >::run( std::forward<Params>(params)... ) &&
-//                 MeshBenchmarksRunner< FullConfig, CellTopology, WorldDimension, float, int, int, int >::run( std::forward<Params>(params)... ) &&
-//                 MeshBenchmarksRunner< FullConfig, CellTopology, WorldDimension, float, int, int, long int >::run( std::forward<Params>(params)... ) &&
-                 MeshBenchmarksRunner< FullConfig, CellTopology, WorldDimension, float, long int, short int, void >::run( std::forward<Params>(params)... ) &&
-//                 MeshBenchmarksRunner< FullConfig, CellTopology, WorldDimension, float, long int, short int, int >::run( std::forward<Params>(params)... ) &&
-//                 MeshBenchmarksRunner< FullConfig, CellTopology, WorldDimension, float, long int, short int, long int >::run( std::forward<Params>(params)... ) &&
-                 MeshBenchmarksRunner< FullConfig, CellTopology, WorldDimension, float, long int, int, void >::run( std::forward<Params>(params)... ) &&
-//                 MeshBenchmarksRunner< FullConfig, CellTopology, WorldDimension, float, long int, int, int >::run( std::forward<Params>(params)... ) &&
-//                 MeshBenchmarksRunner< FullConfig, CellTopology, WorldDimension, float, long int, int, long int >::run( std::forward<Params>(params)... ) &&
-                 MeshBenchmarksRunner< FullConfig, CellTopology, WorldDimension, double, int, short int, void >::run( std::forward<Params>(params)... ) &&
-//                 MeshBenchmarksRunner< FullConfig, CellTopology, WorldDimension, double, int, short int, int >::run( std::forward<Params>(params)... ) &&
-//                 MeshBenchmarksRunner< FullConfig, CellTopology, WorldDimension, double, int, short int, long int >::run( std::forward<Params>(params)... ) &&
-                 MeshBenchmarksRunner< FullConfig, CellTopology, WorldDimension, double, int, int, void >::run( std::forward<Params>(params)... ) &&
-//                 MeshBenchmarksRunner< FullConfig, CellTopology, WorldDimension, double, int, int, int >::run( std::forward<Params>(params)... ) &&
-//                 MeshBenchmarksRunner< FullConfig, CellTopology, WorldDimension, double, int, int, long int >::run( std::forward<Params>(params)... ) &&
-                 MeshBenchmarksRunner< FullConfig, CellTopology, WorldDimension, double, long int, short int, void >::run( std::forward<Params>(params)... ) &&
-//                 MeshBenchmarksRunner< FullConfig, CellTopology, WorldDimension, double, long int, short int, int >::run( std::forward<Params>(params)... ) &&
-//                 MeshBenchmarksRunner< FullConfig, CellTopology, WorldDimension, double, long int, short int, long int >::run( std::forward<Params>(params)... ) &&
-                 MeshBenchmarksRunner< FullConfig, CellTopology, WorldDimension, double, long int, int, void >::run( std::forward<Params>(params)... );
-//                 MeshBenchmarksRunner< FullConfig, CellTopology, WorldDimension, double, long int, int, int >::run( std::forward<Params>(params)... ) &&
-//                 MeshBenchmarksRunner< FullConfig, CellTopology, WorldDimension, double, long int, int, long int >::run( std::forward<Params>(params)... );
+   bool status = MeshBenchmarksRunner< MinimalConfig, CellTopology, WorldDimension, float, int, short int >::run( std::forward<Params>(params)... ) &&
+                 MeshBenchmarksRunner< MinimalConfig, CellTopology, WorldDimension, float, int, int >::run( std::forward<Params>(params)... ) &&
+                 MeshBenchmarksRunner< MinimalConfig, CellTopology, WorldDimension, float, long int, short int >::run( std::forward<Params>(params)... ) &&
+                 MeshBenchmarksRunner< MinimalConfig, CellTopology, WorldDimension, float, long int, int >::run( std::forward<Params>(params)... ) &&
+                 MeshBenchmarksRunner< MinimalConfig, CellTopology, WorldDimension, double, int, short int >::run( std::forward<Params>(params)... ) &&
+                 MeshBenchmarksRunner< MinimalConfig, CellTopology, WorldDimension, double, int, int >::run( std::forward<Params>(params)... ) &&
+                 MeshBenchmarksRunner< MinimalConfig, CellTopology, WorldDimension, double, long int, short int >::run( std::forward<Params>(params)... ) &&
+                 MeshBenchmarksRunner< MinimalConfig, CellTopology, WorldDimension, double, long int, int >::run( std::forward<Params>(params)... ) &&
+                 MeshBenchmarksRunner< FullConfig, CellTopology, WorldDimension, float, int, short int >::run( std::forward<Params>(params)... ) &&
+                 MeshBenchmarksRunner< FullConfig, CellTopology, WorldDimension, float, int, int >::run( std::forward<Params>(params)... ) &&
+                 MeshBenchmarksRunner< FullConfig, CellTopology, WorldDimension, float, long int, short int >::run( std::forward<Params>(params)... ) &&
+                 MeshBenchmarksRunner< FullConfig, CellTopology, WorldDimension, float, long int, int >::run( std::forward<Params>(params)... ) &&
+                 MeshBenchmarksRunner< FullConfig, CellTopology, WorldDimension, double, int, short int >::run( std::forward<Params>(params)... ) &&
+                 MeshBenchmarksRunner< FullConfig, CellTopology, WorldDimension, double, int, int >::run( std::forward<Params>(params)... ) &&
+                 MeshBenchmarksRunner< FullConfig, CellTopology, WorldDimension, double, long int, short int >::run( std::forward<Params>(params)... ) &&
+                 MeshBenchmarksRunner< FullConfig, CellTopology, WorldDimension, double, long int, int >::run( std::forward<Params>(params)... );
    return status;
 }
 
@@ -102,7 +70,7 @@ resolveCellTopology( Benchmark & benchmark,
       case EntityShape::Triangle:
          return setMeshParameters< Topologies::Triangle >( benchmark, metadata, meshFile );
       case EntityShape::Quad:
-         return setMeshParameters< Topologies::Quadrilateral >( benchmark, metadata, meshFile );
+         return setMeshParameters< Topologies::Quadrangle >( benchmark, metadata, meshFile );
       case EntityShape::Tetra:
          return setMeshParameters< Topologies::Tetrahedron >( benchmark, metadata, meshFile );
 //      case EntityShape::Hexahedron:

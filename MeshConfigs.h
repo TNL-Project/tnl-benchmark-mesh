@@ -19,15 +19,13 @@ template< typename Cell,
           int WorldDimension = Cell::dimension,
           typename Real = double,
           typename GlobalIndex = int,
-          typename LocalIndex = GlobalIndex,
-          typename Id = void >
+          typename LocalIndex = GlobalIndex >
 struct FullConfig
 {
    using CellTopology = Cell;
    using RealType = Real;
    using GlobalIndexType = GlobalIndex;
    using LocalIndexType = LocalIndex;
-   using IdType = Id;
 
    static constexpr int worldDimension = WorldDimension;
    static constexpr int meshDimension = Cell::dimension;
@@ -38,26 +36,12 @@ struct FullConfig
    }
 
    /****
-    * Storage of mesh entities.
-    */
-   static constexpr bool entityStorage( int dimension )
-   {
-      /****
-       * Vertices and cells must always be stored.
-       */
-      return true;
-   }
-
-   /****
     * Storage of subentities of mesh entities.
     */
    template< typename EntityTopology >
    static constexpr bool subentityStorage( EntityTopology, int SubentityDimension )
    {
-      /****
-       *  Subvertices of all stored entities must always be stored
-       */
-      return entityStorage( EntityTopology::dimension ) && entityStorage( SubentityDimension );
+      return true;
    }
 
    /****
@@ -76,7 +60,7 @@ struct FullConfig
    template< typename EntityTopology >
    static constexpr bool superentityStorage( EntityTopology, int SuperentityDimension )
    {
-      return entityStorage( EntityTopology::dimension ) && entityStorage( SuperentityDimension );
+      return true;
    }
 
    /****
@@ -109,15 +93,13 @@ template< typename Cell,
           int WorldDimension = Cell::dimension,
           typename Real = double,
           typename GlobalIndex = int,
-          typename LocalIndex = GlobalIndex,
-          typename Id = void >
+          typename LocalIndex = GlobalIndex >
 struct MinimalConfig
 {
    using CellTopology = Cell;
    using RealType = Real;
    using GlobalIndexType = GlobalIndex;
    using LocalIndexType = LocalIndex;
-   using IdType = Id;
 
    static constexpr int worldDimension = WorldDimension;
    static constexpr int meshDimension = Cell::dimension;
@@ -128,21 +110,12 @@ struct MinimalConfig
    }
 
    /****
-    * Storage of mesh entities.
-    */
-   static constexpr bool entityStorage( int dimension )
-   {
-      return ( dimension == 0 || dimension == meshDimension - 1 || dimension == meshDimension );
-   }
-
-   /****
     * Storage of subentities of mesh entities.
     */
    template< typename EntityTopology >
    static constexpr bool subentityStorage( EntityTopology, int SubentityDimension )
    {
-      return entityStorage( EntityTopology::dimension ) &&
-             ( SubentityDimension == 0 || ( SubentityDimension == meshDimension - 1 && EntityTopology::dimension == meshDimension ) );
+      return SubentityDimension == 0 || ( SubentityDimension == meshDimension - 1 && EntityTopology::dimension == meshDimension );
    }
 
    /****
@@ -170,7 +143,11 @@ struct MinimalConfig
    template< typename EntityTopology >
    static constexpr bool entityTagsStorage( EntityTopology )
    {
-      return false;
+//      return false;
+       // NOTE: needed for reorderEntities (could be optimized)
+      using FaceTopology = typename TNL::Meshes::Topologies::Subtopology< CellTopology, meshDimension - 1 >::Topology;
+      return superentityStorage( FaceTopology(), meshDimension ) &&
+             ( EntityTopology::dimension >= meshDimension - 1 || subentityStorage( FaceTopology(), EntityTopology::dimension ) );
    }
 
    /****
@@ -180,6 +157,8 @@ struct MinimalConfig
     */
    static constexpr bool dualGraphStorage()
    {
+//      return false;
+       // NOTE: needed for MeshOrdering (ordering could be pre-generated)
       return true;
    }
 
