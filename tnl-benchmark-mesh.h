@@ -51,8 +51,9 @@ setMeshParameters( Params&&... params )
 bool
 resolveCellTopology( Benchmark & benchmark,
                      Benchmark::MetadataMap metadata,
-                     const String & meshFile )
+                     const Config::ParameterContainer & parameters )
 {
+   const String & meshFile = parameters.getParameter< String >( "mesh-file" );
    benchmark.newBenchmark( meshFile, metadata );
 
    Readers::VTKReader reader( meshFile );
@@ -66,15 +67,15 @@ resolveCellTopology( Benchmark & benchmark,
    switch( reader.getCellShape() )
    {
       case EntityShape::Line:
-         return setMeshParameters< Topologies::Edge >( benchmark, metadata, meshFile );
+         return setMeshParameters< Topologies::Edge >( benchmark, metadata, parameters );
       case EntityShape::Triangle:
-         return setMeshParameters< Topologies::Triangle >( benchmark, metadata, meshFile );
+         return setMeshParameters< Topologies::Triangle >( benchmark, metadata, parameters );
       case EntityShape::Quad:
-         return setMeshParameters< Topologies::Quadrangle >( benchmark, metadata, meshFile );
+         return setMeshParameters< Topologies::Quadrangle >( benchmark, metadata, parameters );
       case EntityShape::Tetra:
-         return setMeshParameters< Topologies::Tetrahedron >( benchmark, metadata, meshFile );
+         return setMeshParameters< Topologies::Tetrahedron >( benchmark, metadata, parameters );
 //      case EntityShape::Hexahedron:
-//         return setMeshParameters< Topologies::Hexahedron >( benchmark, metadata, meshFile );
+//         return setMeshParameters< Topologies::Hexahedron >( benchmark, metadata, parameters );
       default:
          std::cerr << "unsupported cell topology: " << getShapeName(reader.getCellShape()) << std::endl;
          return false;
@@ -92,6 +93,12 @@ setupConfig( Config::ConfigDescription & config )
    config.addEntry< int >( "loops", "Number of iterations for every computation.", 10 );
    config.addEntry< int >( "verbose", "Verbose mode.", 1 );
    config.addRequiredEntry< String >( "mesh-file", "Path of the mesh to load for the benchmark." );
+   config.addEntry< String >( "devices", "Run benchmarks on these devices.", "all" );
+   config.addEntryEnum( "all" );
+   config.addEntryEnum( "host" );
+   #ifdef HAVE_CUDA
+   config.addEntryEnum( "cuda" );
+   #endif
 
    config.addDelimiter( "Device settings:" );
    Devices::Host::configSetup( config );
@@ -116,7 +123,6 @@ main( int argc, char* argv[] )
    const String & outputMode = parameters.getParameter< String >( "output-mode" );
    const int loops = parameters.getParameter< int >( "loops" );
    const int verbose = parameters.getParameter< int >( "verbose" );
-   const String & meshFile = parameters.getParameter< String >( "mesh-file" );
 
    // open log file
    auto mode = std::ios::out;
@@ -130,7 +136,7 @@ main( int argc, char* argv[] )
    // prepare global metadata
    Benchmark::MetadataMap metadata = getHardwareMetadata();
 
-   if( ! resolveCellTopology( benchmark, metadata, meshFile ) )
+   if( ! resolveCellTopology( benchmark, metadata, parameters ) )
       return EXIT_FAILURE;
 
    if( ! benchmark.save( logFile ) ) {

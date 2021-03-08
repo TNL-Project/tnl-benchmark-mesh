@@ -34,6 +34,19 @@ using namespace TNL;
 using namespace TNL::Meshes;
 using namespace TNL::Benchmarks;
 
+template< typename Device >
+bool checkDevice( const Config::ParameterContainer& parameters )
+{
+   const String device = parameters.getParameter< String >( "devices" );
+   if( device == "all" )
+      return true;
+   if( std::is_same< Device, Devices::Host >::value && device == "host" )
+      return true;
+   if( std::is_same< Device, Devices::Cuda >::value && device == "cuda" )
+      return true;
+   return false;
+}
+
 template< typename Real >
 __cuda_callable__
 Real
@@ -63,7 +76,7 @@ struct MeshBenchmarks
 {
    static_assert( std::is_same< typename Mesh::DeviceType, Devices::Host >::value, "The mesh should be loaded on the host." );
 
-   static bool run( Benchmark & benchmark, const String & meshFile )
+   static bool run( Benchmark & benchmark, const Config::ParameterContainer & parameters )
    {
       // initialization is done at compile-time! (we can't access Mesh::Config::worldDimension at run-time because of linker errors)
       // TODO: fix this! (e.g. make Mesh::getWorldDimension() method)
@@ -80,6 +93,7 @@ struct MeshBenchmarks
          {"order", ""},
       };
 
+      const String & meshFile = parameters.getParameter< String >( "mesh-file" );
       Mesh mesh;
       if( ! loadMesh( mesh, meshFile ) ) {
          std::cerr << "Failed to load mesh from file '" << meshFile << "'." << std::endl;
@@ -89,7 +103,7 @@ struct MeshBenchmarks
       // natural ordering
       metadataColumns.back() = {"order", "nat"};
       benchmark.setMetadataColumns( metadataColumns );
-      dispatchAlgorithms( benchmark, mesh );
+      dispatchAlgorithms( benchmark, parameters, mesh );
 
       // k-d tree ordering
       metadataColumns.back() = {"order", "kdt"};
@@ -97,7 +111,7 @@ struct MeshBenchmarks
       using KdTreeOrdering = MeshOrdering< Mesh, KdTreeOrdering >;
       KdTreeOrdering kd;
       kd.reorder( mesh );
-      dispatchAlgorithms( benchmark, mesh );
+      dispatchAlgorithms( benchmark, parameters, mesh );
 
 #ifdef HAVE_CUDA
       cudaProfilerStart();
@@ -109,7 +123,7 @@ struct MeshBenchmarks
       using RCMOrdering = MeshOrdering< Mesh, CuthillMcKeeOrdering<> >;
       RCMOrdering rcm;
       rcm.reorder( mesh );
-      dispatchAlgorithms( benchmark, mesh );
+      dispatchAlgorithms( benchmark, parameters, mesh );
 
 #ifdef HAVE_CUDA
       cudaProfilerStop();
@@ -118,12 +132,12 @@ struct MeshBenchmarks
       return true;
    }
 
-   static void dispatchAlgorithms( Benchmark & benchmark, const Mesh & mesh )
+   static void dispatchAlgorithms( Benchmark & benchmark, const Config::ParameterContainer & parameters, const Mesh & mesh )
    {
-      Algorithms::TemplateStaticFor< int, 1, Mesh::getMeshDimension() + 1, CentersDispatch >::execHost( benchmark, mesh );
-      Algorithms::TemplateStaticFor< int, 1, Mesh::getMeshDimension() + 1, MeasuresDispatch >::execHost( benchmark, mesh );
-      DualMeasuresDispatch::exec( benchmark, mesh );
-      SpheresDispatch::exec( benchmark, mesh );
+      Algorithms::TemplateStaticFor< int, 1, Mesh::getMeshDimension() + 1, CentersDispatch >::execHost( benchmark, parameters, mesh );
+      Algorithms::TemplateStaticFor< int, 1, Mesh::getMeshDimension() + 1, MeasuresDispatch >::execHost( benchmark, parameters, mesh );
+      DualMeasuresDispatch::exec( benchmark, parameters, mesh );
+      SpheresDispatch::exec( benchmark, parameters, mesh );
    }
 
    template< int EntityDimension >
@@ -131,19 +145,19 @@ struct MeshBenchmarks
    {
       template< typename M,
                 typename = typename std::enable_if< M::Config::subentityStorage( typename M::Config::CellTopology{}, 0 ) >::type >
-      static void exec( Benchmark & benchmark, const M & mesh )
+      static void exec( Benchmark & benchmark, const Config::ParameterContainer & parameters, const M & mesh )
       {
          benchmark.setOperation( String("Centers (d = ") + convertToString(EntityDimension) + ")" );
-         benchmark_centers< EntityDimension, Devices::Host >( benchmark, mesh );
+         benchmark_centers< EntityDimension, Devices::Host >( benchmark, parameters, mesh );
 #ifdef HAVE_CUDA
-         benchmark_centers< EntityDimension, Devices::Cuda >( benchmark, mesh );
+         benchmark_centers< EntityDimension, Devices::Cuda >( benchmark, parameters, mesh );
 #endif
       }
 
       template< typename M,
                 typename = typename std::enable_if< ! M::Config::subentityStorage( typename M::Config::CellTopology{}, 0 ) >::type,
                 typename = void >
-      static void exec( Benchmark & benchmark, const M & mesh )
+      static void exec( Benchmark & benchmark, const Config::ParameterContainer & parameters, const M & mesh )
       {
       }
    };
@@ -153,19 +167,19 @@ struct MeshBenchmarks
    {
       template< typename M,
                 typename = typename std::enable_if< M::Config::subentityStorage( typename M::Config::CellTopology{}, 0 ) >::type >
-      static void exec( Benchmark & benchmark, const M & mesh )
+      static void exec( Benchmark & benchmark, const Config::ParameterContainer & parameters, const M & mesh )
       {
          benchmark.setOperation( String("Measures (d = ") + convertToString(EntityDimension) + ")" );
-         benchmark_measures< EntityDimension, Devices::Host >( benchmark, mesh );
+         benchmark_measures< EntityDimension, Devices::Host >( benchmark, parameters, mesh );
 #ifdef HAVE_CUDA
-         benchmark_measures< EntityDimension, Devices::Cuda >( benchmark, mesh );
+         benchmark_measures< EntityDimension, Devices::Cuda >( benchmark, parameters, mesh );
 #endif
       }
 
       template< typename M,
                 typename = typename std::enable_if< ! M::Config::subentityStorage( typename M::Config::CellTopology{}, 0 ) >::type,
                 typename = void >
-      static void exec( Benchmark & benchmark, const M & mesh )
+      static void exec( Benchmark & benchmark, const Config::ParameterContainer & parameters, const M & mesh )
       {
       }
    };
@@ -178,12 +192,12 @@ struct MeshBenchmarks
                               std::is_same< typename M::Config::CellTopology, Topologies::Triangle >::value ||
                               std::is_same< typename M::Config::CellTopology, Topologies::Tetrahedron >::value
                            >::type >
-      static void exec( Benchmark & benchmark, const M & mesh )
+      static void exec( Benchmark & benchmark, const Config::ParameterContainer & parameters, const M & mesh )
       {
          benchmark.setOperation( "Dual M" );
-         benchmark_dual_measures< Devices::Host >( benchmark, mesh );
+         benchmark_dual_measures< Devices::Host >( benchmark, parameters, mesh );
 #ifdef HAVE_CUDA
-         benchmark_dual_measures< Devices::Cuda >( benchmark, mesh );
+         benchmark_dual_measures< Devices::Cuda >( benchmark, parameters, mesh );
 #endif
       }
 
@@ -194,7 +208,7 @@ struct MeshBenchmarks
                               std::is_same< typename M::Config::CellTopology, Topologies::Tetrahedron >::value
                            ) >::type,
                 typename = void >
-      static void exec( Benchmark & benchmark, const M & mesh )
+      static void exec( Benchmark & benchmark, const Config::ParameterContainer & parameters, const M & mesh )
       {
       }
    };
@@ -206,12 +220,12 @@ struct MeshBenchmarks
                               std::is_same< typename M::Config::CellTopology, Topologies::Triangle >::value ||
                               std::is_same< typename M::Config::CellTopology, Topologies::Tetrahedron >::value
                            >::type >
-      static void exec( Benchmark & benchmark, const M & mesh )
+      static void exec( Benchmark & benchmark, const Config::ParameterContainer & parameters, const M & mesh )
       {
          benchmark.setOperation( "Spheres" );
-         benchmark_spheres< Devices::Host >( benchmark, mesh );
+         benchmark_spheres< Devices::Host >( benchmark, parameters, mesh );
 #ifdef HAVE_CUDA
-         benchmark_spheres< Devices::Cuda >( benchmark, mesh );
+         benchmark_spheres< Devices::Cuda >( benchmark, parameters, mesh );
 #endif
       }
 
@@ -221,18 +235,22 @@ struct MeshBenchmarks
                               std::is_same< typename M::Config::CellTopology, Topologies::Tetrahedron >::value
                            ) >::type,
                 typename = void >
-      static void exec( Benchmark & benchmark, const M & mesh )
+      static void exec( Benchmark & benchmark, const Config::ParameterContainer & parameters, const M & mesh )
       {
       }
    };
 
    template< int EntityDimension, typename Device >
-   static void benchmark_centers( Benchmark & benchmark, const Mesh & mesh_src )
+   static void benchmark_centers( Benchmark & benchmark, const Config::ParameterContainer & parameters, const Mesh & mesh_src )
    {
       using Real = typename Mesh::RealType;
       using Index = typename Mesh::GlobalIndexType;
       using PointType = typename Mesh::PointType;
       using DeviceMesh = Meshes::Mesh< typename Mesh::Config, Device >;
+
+      // skip benchmarks on devices which the user did not select
+      if( ! checkDevice< Device >( parameters ) )
+         return;
 
       const Index entitiesCount = mesh_src.template getEntitiesCount< EntityDimension >();
 
@@ -268,11 +286,15 @@ struct MeshBenchmarks
    }
 
    template< int EntityDimension, typename Device >
-   static void benchmark_measures( Benchmark & benchmark, const Mesh & mesh_src )
+   static void benchmark_measures( Benchmark & benchmark, const Config::ParameterContainer & parameters, const Mesh & mesh_src )
    {
       using Real = typename Mesh::RealType;
       using Index = typename Mesh::GlobalIndexType;
       using DeviceMesh = Meshes::Mesh< typename Mesh::Config, Device >;
+
+      // skip benchmarks on devices which the user did not select
+      if( ! checkDevice< Device >( parameters ) )
+         return;
 
       const Index entitiesCount = mesh_src.template getEntitiesCount< EntityDimension >();
 
@@ -308,7 +330,7 @@ struct MeshBenchmarks
    }
 
    template< typename Device >
-   static void benchmark_dual_measures( Benchmark & benchmark, const Mesh & mesh_src )
+   static void benchmark_dual_measures( Benchmark & benchmark, const Config::ParameterContainer & parameters, const Mesh & mesh_src )
    {
       static_assert( std::is_same< typename Mesh::Config::CellTopology, Topologies::Edge >::value ||
                      std::is_same< typename Mesh::Config::CellTopology, Topologies::Triangle >::value ||
@@ -320,6 +342,10 @@ struct MeshBenchmarks
       using LocalIndex = typename Mesh::LocalIndexType;
       using PointType = typename Mesh::PointType;
       using DeviceMesh = Meshes::Mesh< typename Mesh::Config, Device >;
+
+      // skip benchmarks on devices which the user did not select
+      if( ! checkDevice< Device >( parameters ) )
+         return;
 
       const Index entitiesCount = mesh_src.template getEntitiesCount< Mesh::getMeshDimension() >();
 
@@ -375,7 +401,7 @@ struct MeshBenchmarks
    }
 
    template< typename Device >
-   static void benchmark_spheres( Benchmark & benchmark, const Mesh & mesh_src )
+   static void benchmark_spheres( Benchmark & benchmark, const Config::ParameterContainer & parameters, const Mesh & mesh_src )
    {
       static_assert( std::is_same< typename Mesh::Config::CellTopology, Topologies::Triangle >::value ||
                      std::is_same< typename Mesh::Config::CellTopology, Topologies::Tetrahedron >::value,
@@ -385,6 +411,10 @@ struct MeshBenchmarks
       using Index = typename Mesh::GlobalIndexType;
       using LocalIndex = typename Mesh::LocalIndexType;
       using DeviceMesh = Meshes::Mesh< typename Mesh::Config, Device >;
+
+      // skip benchmarks on devices which the user did not select
+      if( ! checkDevice< Device >( parameters ) )
+         return;
 
       const Index entitiesCount = mesh_src.template getEntitiesCount< 0 >();
 
@@ -486,7 +516,7 @@ struct MeshBenchmarksRunner
     static bool
     run( Benchmark & benchmark,
          Benchmark::MetadataMap metadata,
-         const String & meshFile );
+         const Config::ParameterContainer & parameters );
 };
 
 template< template< typename, int, typename, typename, typename > class ConfigTemplate,
@@ -499,11 +529,11 @@ bool
 MeshBenchmarksRunner< ConfigTemplate,  CellTopology, WorldDimension, Real, GlobalIndex, LocalIndex >::
 run( Benchmark & benchmark,
      Benchmark::MetadataMap metadata,
-     const String & meshFile )
+     const Config::ParameterContainer & parameters )
 {
    using Config = ConfigTemplate< CellTopology, WorldDimension, Real, GlobalIndex, LocalIndex >;
    using MeshType = Mesh< Config, Devices::Host >;
-   return MeshBenchmarks< MeshType >::run( benchmark, meshFile );
+   return MeshBenchmarks< MeshType >::run( benchmark, parameters );
 }
 
 extern template struct MeshBenchmarksRunner< FullConfig, Topologies::Edge, 1, float, int, short int >;
