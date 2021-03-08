@@ -19,8 +19,8 @@ host: tnl-benchmark-mesh
 tnl-benchmark-mesh: tnl-benchmark-mesh.o $(MESH_BENCHMARK_TEMPLATES_CPP:%.cpp=%.o)
 	$(CXX) $(LDFLAGS) -o $@ $^ $(LDLIBS)
 cuda: tnl-benchmark-mesh-cuda
-tnl-benchmark-mesh-cuda: tnl-benchmark-mesh-cuda.cu.o $(MESH_BENCHMARK_TEMPLATES_CU:%.cu=%.cu.o)
-	$(CUDA_COMPILER) $(CUDA_LDFLAGS) -o $@ $^ $(CUDA_LDLIBS)
+tnl-benchmark-mesh-cuda: tnl-benchmark-mesh-cuda.cuo $(MESH_BENCHMARK_TEMPLATES_CU:%.cu=%.cuo)
+	$(CXX) $(CUDA_LDFLAGS) -o $@ $^ $(CUDA_LDLIBS)
 
 clean: clean_templates
 .PHONY: clean_templates
@@ -29,11 +29,4 @@ clean_templates:
 	$(RM) -r MeshBenchmarks.templates/
 
 -include $(SOURCES:%.cpp=%.d)
-
-ifeq ($(CUDA_COMPILER),nvcc)
-# nvcc creates .cu.d with rubbish and .d with the content we need
 -include $(CUDA_SOURCES:%.cu=%.d)
-else
-# clang creates .cu.d
--include $(CUDA_SOURCES:%.cu=%.cu.d)
-endif
