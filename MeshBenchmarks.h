@@ -19,7 +19,7 @@
 #include <TNL/Meshes/TypeResolver/resolveMeshType.h>
 #include <TNL/Pointers/DevicePointer.h>
 #include <TNL/Algorithms/ParallelFor.h>
-#include <TNL/Algorithms/TemplateStaticFor.h>
+#include <TNL/Algorithms/staticFor.h>
 #include <TNL/Benchmarks/Benchmarks.h>
 
 #ifdef HAVE_CUDA
@@ -141,8 +141,16 @@ struct MeshBenchmarks
 
    static void dispatchAlgorithms( Benchmark & benchmark, const Config::ParameterContainer & parameters, const Mesh & mesh )
    {
-      Algorithms::TemplateStaticFor< int, 1, Mesh::getMeshDimension() + 1, CentersDispatch >::execHost( benchmark, parameters, mesh );
-      Algorithms::TemplateStaticFor< int, 1, Mesh::getMeshDimension() + 1, MeasuresDispatch >::execHost( benchmark, parameters, mesh );
+      Algorithms::staticFor< int, 1, Mesh::getMeshDimension() + 1 >(
+            [&] ( auto dim ) {
+               CentersDispatch< dim >::exec( benchmark, parameters, mesh );
+            }
+         );
+      Algorithms::staticFor< int, 1, Mesh::getMeshDimension() + 1 >(
+            [&] ( auto dim ) {
+               MeasuresDispatch< dim >::exec( benchmark, parameters, mesh );
+            }
+         );
       DualMeasuresDispatch::exec( benchmark, parameters, mesh );
       SpheresDispatch::exec( benchmark, parameters, mesh );
    }
