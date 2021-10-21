@@ -274,7 +274,7 @@ struct MeshBenchmarks
       Containers::Array< PointType, Device, Index > centers;
       centers.setSize( PointType::getSize() * entitiesCount );
 
-      auto kernel_measures = [] __cuda_callable__
+      auto kernel_centers = [] __cuda_callable__
          ( Index i,
            const DeviceMesh* mesh,
            PointType* array )
@@ -290,7 +290,7 @@ struct MeshBenchmarks
       auto benchmark_func = [&] () {
          Algorithms::ParallelFor< Device >::exec(
                (Index) 0, entitiesCount,
-               kernel_measures,
+               kernel_centers,
                &meshPointer.template getData< Device >(),
                centers.getData() );
       };
@@ -461,8 +461,8 @@ struct MeshBenchmarks
            const DeviceMesh* mesh,
            Real* array )
       {
-        const auto& face = mesh->template getEntity< Mesh::getMeshDimension() - 1 >( fid );
-        const auto face_measure = getEntityMeasure( *mesh, face );
+         const auto& face = mesh->template getEntity< Mesh::getMeshDimension() - 1 >( fid );
+         const auto face_measure = getEntityMeasure( *mesh, face );
 
          const auto cellsCount = face.template getSuperentitiesCount< Mesh::getMeshDimension() >();
          for( LocalIndex c = 0; c < cellsCount; c++ ) {
