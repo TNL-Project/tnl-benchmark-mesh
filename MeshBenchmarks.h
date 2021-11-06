@@ -26,7 +26,6 @@
 #include <cuda_profiler_api.h>
 #endif
 
-#include "MeshOrdering.h"
 #include "MeshConfigs.h"
 #include "MemoryInfo.h"
 
@@ -90,46 +89,26 @@ struct MeshBenchmarks
          {"real", getType< typename Mesh::RealType >()},
          {"gid_t", getType< typename Mesh::GlobalIndexType >()},
          {"lid_t", getType< typename Mesh::LocalIndexType >()},
-         {"order", ""},
       };
+      benchmark.setMetadataColumns( metadataColumns );
 
       const String & meshFile = parameters.getParameter< String >( "mesh-file" );
       Mesh mesh;
       if( ! loadMesh( mesh, meshFile ) ) {
-         std::cerr << "Failed to load mesh from file '" << meshFile << "'." << std::endl;
+         benchmark.addErrorMessage( "Failed to load mesh from file '" + meshFile );
          return false;
       }
 
       // collect memory usage
-//      const MemoryBenchmarkResult meminfo = testMemoryUsage( parameters, mesh );
-
-      // natural ordering
-      metadataColumns.back() = {"order", "nat"};
-      benchmark.setMetadataColumns( metadataColumns );
       // TODO: pass result to the dispatchAlgorithms to append the timings
-//      MemoryBenchmarkResult result = meminfo;
+//      const MemoryBenchmarkResult meminfo = testMemoryUsage( parameters, mesh );
 //      auto noop = [](){};
-//      benchmark.time< TNL::Devices::Host >( "CPU", noop, result );
-      dispatchAlgorithms( benchmark, parameters, mesh );
-
-      // k-d tree ordering
-      metadataColumns.back() = {"order", "kdt"};
-      benchmark.setMetadataColumns( metadataColumns );
-      using KdTreeOrdering = MeshOrdering< Mesh, KdTreeOrdering >;
-      KdTreeOrdering kd;
-      kd.reorder( mesh );
-      dispatchAlgorithms( benchmark, parameters, mesh );
+//      benchmark.time< TNL::Devices::Host >( "CPU", noop, meminfo );
 
 #ifdef HAVE_CUDA
       cudaProfilerStart();
 #endif
 
-      // RCM ordering
-      metadataColumns.back() = {"order", "rcm"};
-      benchmark.setMetadataColumns( metadataColumns );
-      using RCMOrdering = MeshOrdering< Mesh, CuthillMcKeeOrdering<> >;
-      RCMOrdering rcm;
-      rcm.reorder( mesh );
       dispatchAlgorithms( benchmark, parameters, mesh );
 
 #ifdef HAVE_CUDA
