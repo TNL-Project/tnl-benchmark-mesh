@@ -16,7 +16,7 @@
 #include <TNL/Meshes/Topologies/SubentityVertexMap.h>
 
 template< typename Cell,
-          int WorldDimension = Cell::dimension,
+          int SpaceDimension = Cell::dimension,
           typename Real = double,
           typename GlobalIndex = int,
           typename LocalIndex = GlobalIndex >
@@ -27,7 +27,7 @@ struct FullConfig
    using GlobalIndexType = GlobalIndex;
    using LocalIndexType = LocalIndex;
 
-   static constexpr int worldDimension = WorldDimension;
+   static constexpr int spaceDimension = SpaceDimension;
    static constexpr int meshDimension = Cell::dimension;
 
    static TNL::String getConfigType()
@@ -38,27 +38,15 @@ struct FullConfig
    /****
     * Storage of subentities of mesh entities.
     */
-   template< typename EntityTopology >
-   static constexpr bool subentityStorage( EntityTopology, int SubentityDimension )
+   static constexpr bool subentityStorage( int entityDimension, int subentityDimension )
    {
       return true;
    }
 
    /****
-    * Storage of subentity orientations of mesh entities.
-    * It must be false for vertices and cells.
-    */
-   template< typename EntityTopology >
-   static constexpr bool subentityOrientationStorage( EntityTopology, int SubentityDimension )
-   {
-      return false;
-   }
-
-   /****
     * Storage of superentities of mesh entities.
     */
-   template< typename EntityTopology >
-   static constexpr bool superentityStorage( EntityTopology, int SuperentityDimension )
+   static constexpr bool superentityStorage( int entityDimension, int superentityDimension )
    {
       return true;
    }
@@ -66,8 +54,7 @@ struct FullConfig
    /****
     * Storage of mesh entity tags. Boundary tags are necessary for the mesh traverser.
     */
-   template< typename EntityTopology >
-   static constexpr bool entityTagsStorage( EntityTopology )
+   static constexpr bool entityTagsStorage( int entityDimension )
    {
       return true;
    }
@@ -90,7 +77,7 @@ struct FullConfig
 };
 
 template< typename Cell,
-          int WorldDimension = Cell::dimension,
+          int SpaceDimension = Cell::dimension,
           typename Real = double,
           typename GlobalIndex = int,
           typename LocalIndex = GlobalIndex >
@@ -101,7 +88,7 @@ struct MinimalConfig
    using GlobalIndexType = GlobalIndex;
    using LocalIndexType = LocalIndex;
 
-   static constexpr int worldDimension = WorldDimension;
+   static constexpr int spaceDimension = SpaceDimension;
    static constexpr int meshDimension = Cell::dimension;
 
    static TNL::String getConfigType()
@@ -112,42 +99,28 @@ struct MinimalConfig
    /****
     * Storage of subentities of mesh entities.
     */
-   template< typename EntityTopology >
-   static constexpr bool subentityStorage( EntityTopology, int SubentityDimension )
+   static constexpr bool subentityStorage( int entityDimension, int subentityDimension )
    {
-      return SubentityDimension == 0 || ( SubentityDimension == meshDimension - 1 && EntityTopology::dimension == meshDimension );
-   }
-
-   /****
-    * Storage of subentity orientations of mesh entities.
-    * It must be false for vertices and cells.
-    */
-   template< typename EntityTopology >
-   static constexpr bool subentityOrientationStorage( EntityTopology, int SubentityDimension )
-   {
-      return false;
+      return subentityDimension == 0 || ( subentityDimension == meshDimension - 1 && entityDimension == meshDimension );
    }
 
    /****
     * Storage of superentities of mesh entities.
     */
-   template< typename EntityTopology >
-   static constexpr bool superentityStorage( EntityTopology, int SuperentityDimension )
+   static constexpr bool superentityStorage( int entityDimension, int superentityDimension )
    {
-      return ( EntityTopology::dimension == 0 || EntityTopology::dimension == meshDimension - 1 ) && SuperentityDimension == meshDimension;
+      return ( entityDimension == 0 || entityDimension == meshDimension - 1 ) && superentityDimension == meshDimension;
    }
 
    /****
     * Storage of mesh entity tags. Boundary tags are necessary for the mesh traverser.
     */
-   template< typename EntityTopology >
-   static constexpr bool entityTagsStorage( EntityTopology )
+   static constexpr bool entityTagsStorage( int entityDimension )
    {
 //      return false;
        // NOTE: needed for reorderEntities (could be optimized)
-      using FaceTopology = typename TNL::Meshes::Topologies::Subtopology< CellTopology, meshDimension - 1 >::Topology;
-      return superentityStorage( FaceTopology(), meshDimension ) &&
-             ( EntityTopology::dimension >= meshDimension - 1 || subentityStorage( FaceTopology(), EntityTopology::dimension ) );
+      return superentityStorage( meshDimension - 1, meshDimension ) &&
+             ( entityDimension >= meshDimension - 1 || subentityStorage( meshDimension - 1, entityDimension ) );
    }
 
    /****

@@ -76,17 +76,17 @@ struct MeshBenchmarks
 {
    static_assert( std::is_same< typename Mesh::DeviceType, Devices::Host >::value, "The mesh should be loaded on the host." );
 
-   static bool run( Benchmark & benchmark, const Config::ParameterContainer & parameters )
+   static bool run( Benchmark<> & benchmark, const Config::ParameterContainer & parameters )
    {
-      // initialization is done at compile-time! (we can't access Mesh::Config::worldDimension at run-time because of linker errors)
-      // TODO: fix this! (e.g. make Mesh::getWorldDimension() method)
-//      constexpr int worldDimension = Mesh::Config::worldDimension;
+      // initialization is done at compile-time! (we can't access Mesh::Config::spaceDimension at run-time because of linker errors)
+      // TODO: fix this! (e.g. make Mesh::getSpaceDimension() method)
+//      constexpr int spaceDimension = Mesh::Config::spaceDimension;
 
-      Benchmark::MetadataColumns metadataColumns = {
+      Logging::MetadataColumns metadataColumns = {
 //         {"mesh-file", meshFile},
          {"config", Mesh::Config::getConfigType()},
          {"topology", getType< typename Mesh::Config::CellTopology >().replace("Topologies::", "")},
-//         {"wrld dim", worldDimension},
+//         {"space dim", spaceDimension},
          {"real", getType< typename Mesh::RealType >()},
          {"gid_t", getType< typename Mesh::GlobalIndexType >()},
          {"lid_t", getType< typename Mesh::LocalIndexType >()},
@@ -139,7 +139,7 @@ struct MeshBenchmarks
       return true;
    }
 
-   static void dispatchAlgorithms( Benchmark & benchmark, const Config::ParameterContainer & parameters, const Mesh & mesh )
+   static void dispatchAlgorithms( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const Mesh & mesh )
    {
       Algorithms::staticFor< int, 1, Mesh::getMeshDimension() + 1 >(
             [&] ( auto dim ) {
@@ -159,8 +159,8 @@ struct MeshBenchmarks
    struct CentersDispatch
    {
       template< typename M,
-                typename = typename std::enable_if< M::Config::subentityStorage( typename M::Config::CellTopology{}, 0 ) >::type >
-      static void exec( Benchmark & benchmark, const Config::ParameterContainer & parameters, const M & mesh )
+                typename = typename std::enable_if< M::Config::subentityStorage( M::getMeshDimension(), 0 ) >::type >
+      static void exec( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const M & mesh )
       {
          benchmark.setOperation( String("Centers (d = ") + convertToString(EntityDimension) + ")" );
          benchmark_centers< EntityDimension, Devices::Host >( benchmark, parameters, mesh );
@@ -170,9 +170,9 @@ struct MeshBenchmarks
       }
 
       template< typename M,
-                typename = typename std::enable_if< ! M::Config::subentityStorage( typename M::Config::CellTopology{}, 0 ) >::type,
+                typename = typename std::enable_if< ! M::Config::subentityStorage( M::getMeshDimension(), 0 ) >::type,
                 typename = void >
-      static void exec( Benchmark & benchmark, const Config::ParameterContainer & parameters, const M & mesh )
+      static void exec( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const M & mesh )
       {
       }
    };
@@ -181,8 +181,8 @@ struct MeshBenchmarks
    struct MeasuresDispatch
    {
       template< typename M,
-                typename = typename std::enable_if< M::Config::subentityStorage( typename M::Config::CellTopology{}, 0 ) >::type >
-      static void exec( Benchmark & benchmark, const Config::ParameterContainer & parameters, const M & mesh )
+                typename = typename std::enable_if< M::Config::subentityStorage( M::getMeshDimension(), 0 ) >::type >
+      static void exec( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const M & mesh )
       {
          benchmark.setOperation( String("Measures (d = ") + convertToString(EntityDimension) + ")" );
          benchmark_measures< EntityDimension, Devices::Host >( benchmark, parameters, mesh );
@@ -192,9 +192,9 @@ struct MeshBenchmarks
       }
 
       template< typename M,
-                typename = typename std::enable_if< ! M::Config::subentityStorage( typename M::Config::CellTopology{}, 0 ) >::type,
+                typename = typename std::enable_if< ! M::Config::subentityStorage( M::getMeshDimension(), 0 ) >::type,
                 typename = void >
-      static void exec( Benchmark & benchmark, const Config::ParameterContainer & parameters, const M & mesh )
+      static void exec( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const M & mesh )
       {
       }
    };
@@ -207,7 +207,7 @@ struct MeshBenchmarks
                               std::is_same< typename M::Config::CellTopology, Topologies::Triangle >::value ||
                               std::is_same< typename M::Config::CellTopology, Topologies::Tetrahedron >::value
                            >::type >
-      static void exec( Benchmark & benchmark, const Config::ParameterContainer & parameters, const M & mesh )
+      static void exec( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const M & mesh )
       {
          benchmark.setOperation( "Dual M" );
          benchmark_dual_measures< Devices::Host >( benchmark, parameters, mesh );
@@ -223,7 +223,7 @@ struct MeshBenchmarks
                               std::is_same< typename M::Config::CellTopology, Topologies::Tetrahedron >::value
                            ) >::type,
                 typename = void >
-      static void exec( Benchmark & benchmark, const Config::ParameterContainer & parameters, const M & mesh )
+      static void exec( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const M & mesh )
       {
       }
    };
@@ -235,7 +235,7 @@ struct MeshBenchmarks
                               std::is_same< typename M::Config::CellTopology, Topologies::Triangle >::value ||
                               std::is_same< typename M::Config::CellTopology, Topologies::Tetrahedron >::value
                            >::type >
-      static void exec( Benchmark & benchmark, const Config::ParameterContainer & parameters, const M & mesh )
+      static void exec( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const M & mesh )
       {
          benchmark.setOperation( "Spheres" );
          benchmark_spheres< Devices::Host >( benchmark, parameters, mesh );
@@ -250,13 +250,13 @@ struct MeshBenchmarks
                               std::is_same< typename M::Config::CellTopology, Topologies::Tetrahedron >::value
                            ) >::type,
                 typename = void >
-      static void exec( Benchmark & benchmark, const Config::ParameterContainer & parameters, const M & mesh )
+      static void exec( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const M & mesh )
       {
       }
    };
 
    template< int EntityDimension, typename Device >
-   static void benchmark_centers( Benchmark & benchmark, const Config::ParameterContainer & parameters, const Mesh & mesh_src )
+   static void benchmark_centers( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const Mesh & mesh_src )
    {
       using Real = typename Mesh::RealType;
       using Index = typename Mesh::GlobalIndexType;
@@ -301,7 +301,7 @@ struct MeshBenchmarks
    }
 
    template< int EntityDimension, typename Device >
-   static void benchmark_measures( Benchmark & benchmark, const Config::ParameterContainer & parameters, const Mesh & mesh_src )
+   static void benchmark_measures( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const Mesh & mesh_src )
    {
       using Real = typename Mesh::RealType;
       using Index = typename Mesh::GlobalIndexType;
@@ -345,7 +345,7 @@ struct MeshBenchmarks
    }
 
    template< typename Device >
-   static void benchmark_dual_measures( Benchmark & benchmark, const Config::ParameterContainer & parameters, const Mesh & mesh_src )
+   static void benchmark_dual_measures( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const Mesh & mesh_src )
    {
       static_assert( std::is_same< typename Mesh::Config::CellTopology, Topologies::Edge >::value ||
                      std::is_same< typename Mesh::Config::CellTopology, Topologies::Triangle >::value ||
@@ -416,7 +416,7 @@ struct MeshBenchmarks
    }
 
    template< typename Device >
-   static void benchmark_spheres( Benchmark & benchmark, const Config::ParameterContainer & parameters, const Mesh & mesh_src )
+   static void benchmark_spheres( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const Mesh & mesh_src )
    {
       static_assert( std::is_same< typename Mesh::Config::CellTopology, Topologies::Triangle >::value ||
                      std::is_same< typename Mesh::Config::CellTopology, Topologies::Tetrahedron >::value,
@@ -495,7 +495,7 @@ struct MeshBenchmarks
 
 template< template< typename, int, typename, typename, typename > class ConfigTemplate,
           typename CellTopology,
-          int WorldDimension,
+          int SpaceDimension,
           typename Real,
           typename GlobalIndex,
           typename LocalIndex >
@@ -506,24 +506,24 @@ struct MeshBenchmarksRunner
     // otherwise the compiler would always do implicit instead of explicit
     // instantiation.
     static bool
-    run( Benchmark & benchmark,
-         Benchmark::MetadataMap metadata,
+    run( Benchmark<> & benchmark,
+         Benchmark<>::MetadataMap metadata,
          const Config::ParameterContainer & parameters );
 };
 
 template< template< typename, int, typename, typename, typename > class ConfigTemplate,
           typename CellTopology,
-          int WorldDimension,
+          int SpaceDimension,
           typename Real,
           typename GlobalIndex,
           typename LocalIndex >
 bool
-MeshBenchmarksRunner< ConfigTemplate,  CellTopology, WorldDimension, Real, GlobalIndex, LocalIndex >::
-run( Benchmark & benchmark,
-     Benchmark::MetadataMap metadata,
+MeshBenchmarksRunner< ConfigTemplate,  CellTopology, SpaceDimension, Real, GlobalIndex, LocalIndex >::
+run( Benchmark<> & benchmark,
+     Benchmark<>::MetadataMap metadata,
      const Config::ParameterContainer & parameters )
 {
-   using Config = ConfigTemplate< CellTopology, WorldDimension, Real, GlobalIndex, LocalIndex >;
+   using Config = ConfigTemplate< CellTopology, SpaceDimension, Real, GlobalIndex, LocalIndex >;
    using MeshType = Mesh< Config, Devices::Host >;
    return MeshBenchmarks< MeshType >::run( benchmark, parameters );
 }
