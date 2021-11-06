@@ -121,9 +121,7 @@ endif
 
 
 # append flags for TNL
-# TODO: add TNL as a git submodule
-#TNL_INCLUDE_DIRS := -I $(mkfile_path)/libs/tnl/src/ -I $(mkfile_path)/libs/tnl/src/3rdparty/
-TNL_INCLUDE_DIRS := -I ~/.local/include
+TNL_INCLUDE_DIRS := -I $(mkfile_path)/libs/tnl/src/ -I $(mkfile_path)/libs/tnl/src/3rdparty/
 CPPFLAGS += $(TNL_INCLUDE_DIRS)
 CUDA_CPPFLAGS += $(TNL_INCLUDE_DIRS) -DHAVE_CUDA
 

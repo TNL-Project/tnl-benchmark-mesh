@@ -3,17 +3,17 @@
 have_term := $(TERM)
 
 ifdef have_term
-COLOR_ALL_OFF := $(shell tput sgr0)
-COLOR_BOLD    := $(shell tput bold)
-COLOR_BLUE    := $(COLOR_BOLD)$(shell tput setaf 4)
-COLOR_GREEN   := $(COLOR_BOLD)$(shell tput setaf 2)
-COLOR_RED     := $(COLOR_BOLD)$(shell tput setaf 1)
-COLOR_YELLOW  := $(COLOR_BOLD)$(shell tput setaf 3)
+    COLOR_ALL_OFF := $(shell tput sgr0)
+    COLOR_BOLD    := $(shell tput bold)
+    COLOR_BLUE    := $(COLOR_BOLD)$(shell tput setaf 4)
+    COLOR_GREEN   := $(COLOR_BOLD)$(shell tput setaf 2)
+    COLOR_RED     := $(COLOR_BOLD)$(shell tput setaf 1)
+    COLOR_YELLOW  := $(COLOR_BOLD)$(shell tput setaf 3)
 else
-COLOR_ALL_OFF :=
-COLOR_BOLD    :=
-COLOR_BLUE    :=
-COLOR_GREEN   :=
-COLOR_RED     :=
-COLOR_YELLOW  :=
+    COLOR_ALL_OFF :=
+    COLOR_BOLD    :=
+    COLOR_BLUE    :=
+    COLOR_GREEN   :=
+    COLOR_RED     :=
+    COLOR_YELLOW  :=
 endif
