@@ -1,0 +1,19 @@
+default:
+  image: "archlinux/devel-tnl:latest"
+  before_script:
+    - export MAKEFLAGS=-j$(nproc)
+    # make sure that $PATH and other essential variables are set correctly
+    - source /etc/profile
+
+# automatically initialize git submodules
+# https://docs.gitlab.com/ee/ci/git_submodules.html
+variables:
+  GIT_SUBMODULE_STRATEGY: recursive
+
+stages:
+  - build
+
+build_benchmarks:
+  stage: build
+  script:
+    - make
