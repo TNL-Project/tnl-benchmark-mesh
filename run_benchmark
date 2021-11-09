@@ -1,0 +1,73 @@
+#! /bin/bash
+
+set -e
+
+NCPUS="$SLURM_CPUS_PER_TASK"
+# set fallback when not running under Slurm
+if [[ "$NCPUS" == "" ]]; then
+    NCPUS=12
+fi
+
+function run_benchmark()
+{
+    echo "mesh = $(basename $mesh_file)"
+
+    # set number of OpenMP threads
+    omp_threads=${omp_threads:=1}
+    if [[ "$omp_threads" == "1" ]]; then
+        omp_enabled=false
+    else
+        omp_enabled=true
+    fi
+
+    if [[ "$solver" =~ "cuda" ]]; then
+        log_file=log.CUDA_$(basename "$mesh_file" .vtk)
+    else
+        log_file=log.OMP${omp_threads}_$(basename "$mesh_file" .vtk)
+    fi
+
+    local physcpubind="0-$(( $NCPUS - 1 ))"
+    if [[ "$NCPUS" == 1 ]]; then
+        physcpubind=0
+    fi
+    # do not bind for CUDA (numactl works under Slurm only when all CPU cores are allocated, otherwise IDs don't match)
+    if [[ ! "$solver" =~ "cuda" ]]; then
+        local solver="numactl --membind 0 --cpunodebind 0 --physcpubind $physcpubind $solver"
+    fi
+
+    ${solver} \
+        --verbose 1 \
+        --loops 100 \
+        --mesh-file "$mesh_file" \
+        --log-file "$log_file" \
+        --output-mode "append" \
+        --openmp-enabled "$omp_enabled" \
+        --openmp-max-threads "$omp_threads" \
+    || true
+}
+
+function run_set()
+{
+    for mesh_type in mrizka cube1m; do
+    for id in 1 2 3 4 5; do
+        [[ "$mesh_type" == "mrizka" ]] && id="$id.rcm"
+        mesh_file="./meshes/${mesh_type}_$id.vtk"
+        run_benchmark
+    done
+    done
+}
+
+#solver="./tnl-benchmark-mesh"
+#omp_threads=1
+#run_set
+
+if [[ "$CUDA_VISIBLE_DEVICES" == "" ]]; then
+    solver="./tnl-benchmark-mesh --devices host"
+    for omp_threads in 1 2 4 6 8 $NCPUS; do
+       run_set
+    done
+else
+    solver="./tnl-benchmark-mesh-cuda --devices cuda"
+    omp_threads=1
+    run_set
+fi
