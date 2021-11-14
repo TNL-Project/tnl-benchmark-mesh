@@ -2,16 +2,12 @@
 
 set -e
 
-NCPUS="$SLURM_CPUS_PER_TASK"
-# set fallback when not running under Slurm
-if [[ "$NCPUS" == "" ]]; then
-    NCPUS=12
-fi
+# maximum number of CPU cores available on the system
+# (this respects even $SLURM_CPUS_PER_TASK when executed under Slurm)
+NCPUS=$(nproc)
 
 function run_benchmark()
 {
-    echo "mesh = $(basename $mesh_file)"
-
     # set number of OpenMP threads
     omp_threads=${omp_threads:=1}
     if [[ "$omp_threads" == "1" ]]; then
@@ -48,6 +44,10 @@ function run_benchmark()
 
 function run_set()
 {
+    if (( $omp_threads > $NCPUS )); then
+        return
+    fi
+
     for mesh_type in mrizka cube1m; do
     for id in 1 2 3 4 5; do
         [[ "$mesh_type" == "mrizka" ]] && id="$id.rcm"
@@ -61,13 +61,11 @@ function run_set()
 #omp_threads=1
 #run_set
 
-if [[ "$CUDA_VISIBLE_DEVICES" == "" ]]; then
-    solver="./tnl-benchmark-mesh --devices host"
-    for omp_threads in 1 2 4 6 8 $NCPUS; do
-       run_set
-    done
-else
-    solver="./tnl-benchmark-mesh-cuda --devices cuda"
-    omp_threads=1
-    run_set
-fi
+solver="./tnl-benchmark-mesh --devices host"
+for omp_threads in 1 2 4 6 8 12; do
+   run_set
+done
+
+solver="./tnl-benchmark-mesh-cuda --devices cuda"
+omp_threads=1
+run_set
