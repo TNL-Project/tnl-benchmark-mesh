@@ -1,0 +1,23 @@
+# tnl-benchmark-mesh
+
+Benchmarks for the unstructured mesh in TNL. Two algorithms (calculation of cell measures and
+calculation of curve lengths/surface areas around vertices) were presented in the paper [TODO].
+
+## Quickstart
+
+1. Make sure that [Git](https://git-scm.com/), [Git LFS](https://git-lfs.github.com/),
+   [GNU Make](https://www.gnu.org/software/make/), [Python 3](https://www.python.org/), and
+   [CUDA 11](https://developer.nvidia.com/cuda-toolkit) are installed on your Linux system.
+
+2. Clone the repository and initialize the submodules:
+
+       git clone --recurse-submodules https://mmg-gitlab.fjfi.cvut.cz/gitlab/tnl/tnl-benchmark-mesh.git
+
+3. Build the benchmark binaries:
+
+       cd tnl-benchmark-mesh
+       make
+
+4. Run the script to execute the benchmarks on the meshes included in the repository:
+
+       ./run_benchmark
