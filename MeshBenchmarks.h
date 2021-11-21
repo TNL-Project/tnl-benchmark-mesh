@@ -77,22 +77,19 @@ struct MeshBenchmarks
 
    static bool run( Benchmark<> & benchmark, const Config::ParameterContainer & parameters )
    {
-      // initialization is done at compile-time! (we can't access Mesh::Config::spaceDimension at run-time because of linker errors)
-      // TODO: fix this! (e.g. make Mesh::getSpaceDimension() method)
-//      constexpr int spaceDimension = Mesh::Config::spaceDimension;
+      const String & meshFile = parameters.getParameter< String >( "mesh-file" );
 
       Logging::MetadataColumns metadataColumns = {
-//         {"mesh-file", meshFile},
+         {"mesh-file", meshFile},
          {"config", Mesh::Config::getConfigType()},
          {"topology", getType< typename Mesh::Config::CellTopology >().replace("Topologies::", "")},
-//         {"space dim", spaceDimension},
+         {"space dim", std::to_string(Mesh::Config::spaceDimension)},
          {"real", getType< typename Mesh::RealType >()},
          {"gid_t", getType< typename Mesh::GlobalIndexType >()},
          {"lid_t", getType< typename Mesh::LocalIndexType >()},
       };
       benchmark.setMetadataColumns( metadataColumns );
 
-      const String & meshFile = parameters.getParameter< String >( "mesh-file" );
       Mesh mesh;
       if( ! loadMesh( mesh, meshFile ) ) {
          benchmark.addErrorMessage( "Failed to load mesh from file '" + meshFile );
@@ -237,7 +234,6 @@ struct MeshBenchmarks
    template< int EntityDimension, typename Device >
    static void benchmark_centers( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const Mesh & mesh_src )
    {
-      using Real = typename Mesh::RealType;
       using Index = typename Mesh::GlobalIndexType;
       using PointType = typename Mesh::PointType;
       using DeviceMesh = Meshes::Mesh< typename Mesh::Config, Device >;
@@ -486,7 +482,6 @@ struct MeshBenchmarksRunner
     // instantiation.
     static bool
     run( Benchmark<> & benchmark,
-         Benchmark<>::MetadataMap metadata,
          const Config::ParameterContainer & parameters );
 };
 
@@ -499,7 +494,6 @@ template< template< typename, int, typename, typename, typename > class ConfigTe
 bool
 MeshBenchmarksRunner< ConfigTemplate,  CellTopology, SpaceDimension, Real, GlobalIndex, LocalIndex >::
 run( Benchmark<> & benchmark,
-     Benchmark<>::MetadataMap metadata,
      const Config::ParameterContainer & parameters )
 {
    using Config = ConfigTemplate< CellTopology, SpaceDimension, Real, GlobalIndex, LocalIndex >;

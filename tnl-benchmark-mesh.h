@@ -50,12 +50,9 @@ setMeshParameters( Params&&... params )
 
 bool
 resolveCellTopology( Benchmark<> & benchmark,
-                     Logging::MetadataMap metadata,
                      const Config::ParameterContainer & parameters )
 {
    const String & meshFile = parameters.getParameter< String >( "mesh-file" );
-   benchmark.newBenchmark( meshFile, metadata );
-
    Readers::VTKReader reader( meshFile );
    reader.detectMesh();
    if( reader.getMeshType() != "Meshes::Mesh" ) {
@@ -67,15 +64,15 @@ resolveCellTopology( Benchmark<> & benchmark,
    switch( reader.getCellShape() )
    {
       case EntityShape::Line:
-         return setMeshParameters< Topologies::Edge >( benchmark, metadata, parameters );
+         return setMeshParameters< Topologies::Edge >( benchmark, parameters );
       case EntityShape::Triangle:
-         return setMeshParameters< Topologies::Triangle >( benchmark, metadata, parameters );
+         return setMeshParameters< Topologies::Triangle >( benchmark, parameters );
       case EntityShape::Quad:
-         return setMeshParameters< Topologies::Quadrangle >( benchmark, metadata, parameters );
+         return setMeshParameters< Topologies::Quadrangle >( benchmark, parameters );
       case EntityShape::Tetra:
-         return setMeshParameters< Topologies::Tetrahedron >( benchmark, metadata, parameters );
+         return setMeshParameters< Topologies::Tetrahedron >( benchmark, parameters );
 //      case EntityShape::Hexahedron:
-//         return setMeshParameters< Topologies::Hexahedron >( benchmark, metadata, parameters );
+//         return setMeshParameters< Topologies::Hexahedron >( benchmark, parameters );
       default:
          std::cerr << "unsupported cell topology: " << getShapeName(reader.getCellShape()) << std::endl;
          return false;
@@ -131,18 +128,14 @@ main( int argc, char* argv[] )
    std::ofstream logFile( logFileName.getString(), mode );
 
    // init benchmark and common metadata
-   Benchmark<> benchmark( loops, verbose );
+   Benchmark<> benchmark( logFile, loops, verbose );
 
-   // prepare global metadata
-   Logging::MetadataMap metadata = getHardwareMetadata();
+   // write global metadata into a separate file
+   std::map< std::string, std::string > metadata = getHardwareMetadata();
+   writeMapAsJson( metadata, logFileName, ".metadata.json" );
 
-   if( ! resolveCellTopology( benchmark, metadata, parameters ) )
+   if( ! resolveCellTopology( benchmark, parameters ) )
       return EXIT_FAILURE;
-
-   if( ! benchmark.save( logFile ) ) {
-       std::cerr << "Failed to write the benchmark results to file '" << parameters.getParameter< String >( "log-file" ) << "'." << std::endl;
-       return EXIT_FAILURE;
-   }
 
    return EXIT_SUCCESS;
 }
