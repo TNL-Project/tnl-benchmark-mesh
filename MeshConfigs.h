@@ -109,7 +109,7 @@ struct MinimalConfig
     */
    static constexpr bool superentityStorage( int entityDimension, int superentityDimension )
    {
-      return ( entityDimension == 0 || entityDimension == meshDimension - 1 ) && superentityDimension == meshDimension;
+      return entityDimension == meshDimension - 1 && superentityDimension == meshDimension;
    }
 
    /****
@@ -117,10 +117,7 @@ struct MinimalConfig
     */
    static constexpr bool entityTagsStorage( int entityDimension )
    {
-//      return false;
-       // NOTE: needed for reorderEntities (could be optimized)
-      return superentityStorage( meshDimension - 1, meshDimension ) &&
-             ( entityDimension >= meshDimension - 1 || subentityStorage( meshDimension - 1, entityDimension ) );
+      return false;
    }
 
    /****
@@ -130,9 +127,7 @@ struct MinimalConfig
     */
    static constexpr bool dualGraphStorage()
    {
-//      return false;
-       // NOTE: needed for MeshOrdering (ordering could be pre-generated)
-      return true;
+      return false;
    }
 
    /****
