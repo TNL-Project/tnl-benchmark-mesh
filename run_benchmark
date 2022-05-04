@@ -36,7 +36,6 @@ function run_benchmark()
         --loops 100 \
         --mesh-file "$mesh_file" \
         --log-file "$log_file" \
-        --output-mode "append" \
         --openmp-enabled "$omp_enabled" \
         --openmp-max-threads "$omp_threads" \
     || true
@@ -57,7 +56,7 @@ function run_set()
     done
 }
 
-#solver="./tnl-benchmark-mesh"
+#solver="./tnl-benchmark-mesh --devices host"
 #omp_threads=1
 #run_set
 

@@ -132,7 +132,7 @@ main( int argc, char* argv[] )
 
    // write global metadata into a separate file
    std::map< std::string, std::string > metadata = getHardwareMetadata();
-   writeMapAsJson( metadata, logFileName, ".metadata.json" );
+   writeMapAsJson( metadata, logFileName + ".log", ".metadata.json" );
 
    if( ! resolveCellTopology( benchmark, parameters ) )
       return EXIT_FAILURE;
