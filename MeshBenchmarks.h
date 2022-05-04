@@ -98,7 +98,7 @@ struct MeshBenchmarks
 
       // collect memory usage
       // TODO: pass result to the dispatchAlgorithms to append the timings
-//      const MemoryBenchmarkResult meminfo = testMemoryUsage( parameters, mesh );
+//      MemoryBenchmarkResult meminfo = testMemoryUsage( parameters, mesh );
 //      auto noop = [](){};
 //      benchmark.time< TNL::Devices::Host >( "CPU", noop, meminfo );
 

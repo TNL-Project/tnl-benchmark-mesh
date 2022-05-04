@@ -124,7 +124,7 @@ getSelfPhysicalMemory()
 
 #include <TNL/Benchmarks/Benchmarks.h>
 #include <TNL/Config/ParameterContainer.h>
-#include <TNL/Containers/StaticVector.h>
+#include <TNL/Containers/Vector.h>
 
 struct MemoryBenchmarkResult
 : public TNL::Benchmarks::BenchmarkResult
@@ -158,39 +158,25 @@ MemoryBenchmarkResult
 testMemoryUsage( const TNL::Config::ParameterContainer& parameters,
                  const Mesh& mesh )
 {
-    const long baseline = getSelfPhysicalMemory();
-    const Mesh m1 = mesh;
-    const long check1 = getSelfPhysicalMemory();
-    const Mesh m2 = mesh;
-    const long check2 = getSelfPhysicalMemory();
-    const Mesh m3 = mesh;
-    const long check3 = getSelfPhysicalMemory();
-    const Mesh m4 = mesh;
-    const long check4 = getSelfPhysicalMemory();
-    const Mesh m5 = mesh;
-    const long check5 = getSelfPhysicalMemory();
-    const Mesh m6 = mesh;
-    const long check6 = getSelfPhysicalMemory();
-    const Mesh m7 = mesh;
-    const long check7 = getSelfPhysicalMemory();
-    const Mesh m8 = mesh;
-    const long check8 = getSelfPhysicalMemory();
-    const Mesh m9 = mesh;
-    const long check9 = getSelfPhysicalMemory();
-    const Mesh m10 = mesh;
-    const long check10 = getSelfPhysicalMemory();
+    std::vector< Mesh > objects;
+    std::vector< long > memory;
 
-    TNL::Containers::StaticVector< 10, long > data;
-    data[0] = check1 - baseline;
-    data[1] = check2 - check1;
-    data[2] = check3 - check2;
-    data[3] = check4 - check3;
-    data[4] = check5 - check4;
-    data[5] = check6 - check5;
-    data[6] = check7 - check6;
-    data[7] = check8 - check7;
-    data[8] = check9 - check8;
-    data[9] = check10 - check9;
+    // baseline
+    memory.push_back( getSelfPhysicalMemory() );
+
+    // add objects until at least min_objects are created and min_memory is used
+    // (the latter condition is important to ensure accurate measurements of small objects)
+    const std::size_t min_objects = 10;
+    const long min_memory = 10 * 1024 * 1024;  // 10 MiB
+    while( objects.size() < min_objects || memory.back() - memory.front() < min_memory ) {
+        objects.emplace_back( mesh );
+        memory.push_back( getSelfPhysicalMemory() );
+    }
+
+    TNL::Containers::Vector< long > data;
+    data.setSize( memory.size() - 1 );
+    for( int i = 0; i < data.getSize(); i++ )
+        data[ i ] = memory[ i + 1 ] - memory[ i ];
 
     const double mean = TNL::sum( data ) / (double) data.getSize();
     const double stddev = 1.0 / std::sqrt( data.getSize() - 1 ) * TNL::l2Norm( data - mean );
