@@ -1,7 +1,9 @@
 # tnl-benchmark-mesh
 
 Benchmarks for the unstructured mesh in TNL. Two algorithms (calculation of cell measures and
-calculation of curve lengths/surface areas around vertices) were presented in the paper [TODO].
+calculation of curve lengths/surface areas around vertices) were presented in the paper
+[Configurable open-source data structure for distributed conforming unstructured homogeneous meshes
+with GPU support](https://doi.org/10.1145/3536164).
 
 ## Quickstart
 
