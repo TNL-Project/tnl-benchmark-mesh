@@ -47,8 +47,8 @@ ifeq ($(BUILD),Release)
         CXXFLAGS += -flto=thin
         LDFLAGS += -O3 -march=native -mtune=native -flto=thin
     else ifeq ($(CXX),g++)
-        CXXFLAGS += -flto
-        LDFLAGS += -O3 -march=native -mtune=native -flto
+        CXXFLAGS += -flto=auto
+        LDFLAGS += -O3 -march=native -mtune=native -flto=auto
     endif
 else ifeq ($(BUILD),Debug)
     CXXFLAGS += -Og -g
