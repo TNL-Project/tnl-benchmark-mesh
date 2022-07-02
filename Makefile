@@ -1,9 +1,9 @@
-ifeq ("$(wildcard MeshBenchmarks.templates/)","")
-$(shell python3 ./MeshBenchmarks.py)
+ifeq ("$(wildcard MeshBenchmarksRunner.templates/)","")
+$(shell python3 ./MeshBenchmarksRunner.py)
 endif
 
-MESH_BENCHMARK_TEMPLATES_CPP = $(sort $(wildcard MeshBenchmarks.templates/MeshBenchmarks.t*.cpp))
-MESH_BENCHMARK_TEMPLATES_CU = $(sort $(wildcard MeshBenchmarks.templates/MeshBenchmarks.t*.cu))
+MESH_BENCHMARK_TEMPLATES_CPP = $(sort $(wildcard MeshBenchmarksRunner.templates/MeshBenchmarksRunner.t*.cpp))
+MESH_BENCHMARK_TEMPLATES_CU = $(sort $(wildcard MeshBenchmarksRunner.templates/MeshBenchmarksRunner.t*.cu))
 
 SOURCES = tnl-benchmark-mesh.cpp $(MESH_BENCHMARK_TEMPLATES_CPP)
 CUDA_SOURCES = tnl-benchmark-mesh-cuda.cu $(MESH_BENCHMARK_TEMPLATES_CU)
@@ -26,7 +26,7 @@ clean: clean_templates
 .PHONY: clean_templates
 clean_templates:
 	$(RM) tnl-benchmark-mesh tnl-benchmark-mesh-cuda
-	$(RM) -r MeshBenchmarks.templates/
+	$(RM) -r MeshBenchmarksRunner.templates/
 
 -include $(SOURCES:%.cpp=%.d)
 -include $(CUDA_SOURCES:%.cu=%.d)

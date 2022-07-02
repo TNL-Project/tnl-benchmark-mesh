@@ -1,5 +1,3 @@
-// Implemented by: Jakub Klinkovsky
-
 #pragma once
 
 #include <TNL/Config/parseCommandLine.h>
@@ -7,7 +5,9 @@
 #include <TNL/Devices/Cuda.h>
 #include <TNL/Cuda/DeviceInfo.h>
 
-#include "MeshBenchmarks.h"
+#include "MeshBenchmarksRunner.h"
+#include "TNL/Meshes/Topologies/Polygon.h"
+#include "TNL/Meshes/Topologies/Polyhedron.h"
 
 using namespace TNL;
 using namespace TNL::Meshes;
@@ -57,12 +57,16 @@ resolveCellTopology( Benchmark<> & benchmark,
          return setMeshParameters< Topologies::Edge >( benchmark, parameters );
       case EntityShape::Triangle:
          return setMeshParameters< Topologies::Triangle >( benchmark, parameters );
-      case EntityShape::Quad:
-         return setMeshParameters< Topologies::Quadrangle >( benchmark, parameters );
+///      case EntityShape::Quad:
+///         return setMeshParameters< Topologies::Quadrangle >( benchmark, parameters );
+      case EntityShape::Polygon:
+         return setMeshParameters< Topologies::Polygon >( benchmark, parameters );
       case EntityShape::Tetra:
          return setMeshParameters< Topologies::Tetrahedron >( benchmark, parameters );
 //      case EntityShape::Hexahedron:
 //         return setMeshParameters< Topologies::Hexahedron >( benchmark, parameters );
+      case EntityShape::Polyhedron:
+         return setMeshParameters< Topologies::Polyhedron >( benchmark, parameters );
       default:
          std::cerr << "unsupported cell topology: " << getShapeName(reader.getCellShape()) << std::endl;
          return false;
