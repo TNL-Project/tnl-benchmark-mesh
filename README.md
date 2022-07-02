@@ -13,7 +13,7 @@ with GPU support](https://doi.org/10.1145/3536164).
 
 2. Clone the repository and initialize the submodules:
 
-       git clone --recurse-submodules https://mmg-gitlab.fjfi.cvut.cz/gitlab/tnl/tnl-benchmark-mesh.git
+       git clone --recurse-submodules https://gitlab.com/tnl-project/tnl-benchmark-mesh.git
 
 3. Build the benchmark binaries:
 
