@@ -1,13 +1,3 @@
-/***************************************************************************
-                          MeshBenchmarks.h  -  description
-                             -------------------
-    begin                : Nov 21, 2017
-    copyright            : (C) 2017 by Tomas Oberhuber et al.
-    email                : tomas.oberhuber@fjfi.cvut.cz
- ***************************************************************************/
-
-/* See Copyright Notice in tnl/Copyright */
-
 // Implemented by: Jakub Klinkovsky
 
 #pragma once
@@ -28,23 +18,11 @@
 
 #include "MeshConfigs.h"
 #include "MemoryInfo.h"
+#include "Utils.h"
 
 using namespace TNL;
 using namespace TNL::Meshes;
 using namespace TNL::Benchmarks;
-
-template< typename Device >
-bool checkDevice( const Config::ParameterContainer& parameters )
-{
-   const String device = parameters.getParameter< String >( "devices" );
-   if( device == "all" )
-      return true;
-   if( std::is_same< Device, Devices::Host >::value && device == "host" )
-      return true;
-   if( std::is_same< Device, Devices::Cuda >::value && device == "cuda" )
-      return true;
-   return false;
-}
 
 template< typename Real >
 __cuda_callable__
@@ -82,7 +60,7 @@ struct MeshBenchmarks
       Logging::MetadataColumns metadataColumns = {
          {"mesh-file", meshFile},
          {"config", Mesh::Config::getConfigType()},
-         {"topology", getType< typename Mesh::Config::CellTopology >().replace("Topologies::", "")},
+         {"topology", removeNamespaces( getType< typename Mesh::Config::CellTopology >() ) },
          {"space dim", std::to_string(Mesh::Config::spaceDimension)},
          {"real", getType< typename Mesh::RealType >()},
          {"gid_t", getType< typename Mesh::GlobalIndexType >()},

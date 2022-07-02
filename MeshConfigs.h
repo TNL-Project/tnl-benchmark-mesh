@@ -1,13 +1,3 @@
-/***************************************************************************
-                          MeshConfigs.h  -  description
-                             -------------------
-    begin                : Dec 12, 2017
-    copyright            : (C) 2017 by Tomas Oberhuber et al.
-    email                : tomas.oberhuber@fjfi.cvut.cz
- ***************************************************************************/
-
-/* See Copyright Notice in tnl/Copyright */
-
 // Implemented by: Jakub Klinkovsky
 
 #pragma once
