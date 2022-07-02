@@ -4,6 +4,8 @@
 #include <TNL/Meshes/Mesh.h>
 #include <TNL/Meshes/Geometry/getEntityCenter.h>
 #include <TNL/Meshes/Geometry/getEntityMeasure.h>
+#include <TNL/Meshes/Geometry/getDecomposedMesh.h>
+#include <TNL/Meshes/Geometry/getPlanarMesh.h>
 #include <TNL/Meshes/TypeResolver/resolveMeshType.h>
 #include <TNL/Pointers/DevicePointer.h>
 #include <TNL/Algorithms/ParallelFor.h>
@@ -15,6 +17,7 @@
 
 using namespace TNL;
 using namespace TNL::Meshes;
+using namespace TNL::Meshes::Readers;
 using namespace TNL::Benchmarks;
 
 template< typename Real >
@@ -42,8 +45,73 @@ getSimplexMeasure( const TNL::Containers::StaticVector< 3, Real > (& points) [4]
 }
 
 
+static void benchmark_reader( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, std::shared_ptr< MeshReader > reader )
+{
+   if( ! checkDevice< Devices::Host >( parameters ) )
+      return;
+
+   auto reset = [&]() {
+      reader->reset();
+   };
+
+   auto benchmark_func = [&] () {
+      reader->detectMesh();
+   };
+
+   benchmark.time< Devices::Host >( reset,
+                                    "CPU",
+                                    benchmark_func );
+}
+
+template< typename Mesh >
+void benchmark_init( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, std::shared_ptr< MeshReader > reader )
+{
+   if( ! checkDevice< Devices::Host >( parameters ) )
+      return;
+
+   auto reset = [&]() {
+      reader->detectMesh();
+   };
+
+   auto benchmark_func = [&] () {
+      Mesh mesh;
+      reader->loadMesh( mesh );
+   };
+
+   benchmark.time< Devices::Host >( reset,
+                                    "CPU",
+                                    benchmark_func );
+}
+
+template< typename DeviceFrom,
+          typename DeviceTo,
+          typename M >
+static void benchmark_copy( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const M & mesh_src )
+{
+   using MeshFrom = Meshes::Mesh< typename M::Config, DeviceFrom >;
+   using MeshTo = Meshes::Mesh< typename M::Config, DeviceTo >;
+   using Device = typename std::conditional_t< std::is_same< DeviceFrom, Devices::Host >::value &&
+                                               std::is_same< DeviceTo, Devices::Host >::value,
+                                               Devices::Host,
+                                               Devices::Cuda >;
+
+   // skip benchmarks on devices which the user did not select
+   if( ! checkDevice< Device >( parameters ) )
+      return;
+
+   const MeshFrom meshFrom = mesh_src;
+
+   auto benchmark_func = [&] () {
+      MeshTo meshTo = meshFrom;
+   };
+
+   benchmark.time< Device >( [] () {},
+                             (std::is_same< Device, Devices::Host >::value) ? "CPU" : "GPU",
+                             benchmark_func );
+}
+
 template< int EntityDimension, typename Device, typename Mesh >
-static void benchmark_centers( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const Mesh & mesh_src )
+void benchmark_centers( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const Mesh & mesh_src )
 {
    using Index = typename Mesh::GlobalIndexType;
    using PointType = typename Mesh::PointType;
@@ -278,6 +346,78 @@ static void benchmark_spheres( Benchmark<> & benchmark, const Config::ParameterC
                              benchmark_func );
 }
 
+template< EntityDecomposerVersion DecomposerVersion,
+          EntityDecomposerVersion SubDecomposerVersion = EntityDecomposerVersion::ConnectEdgesToPoint,
+          typename M >
+static void benchmark_decomposition( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const M & mesh_src )
+{
+   // skip benchmarks on devices which the user did not select
+   if( ! checkDevice< Devices::Host >( parameters ) )
+      return;
+
+   auto benchmark_func = [&] () {
+      auto meshBuilder = decomposeMesh< DecomposerVersion, SubDecomposerVersion >( mesh_src );
+   };
+
+   benchmark.time< Devices::Host >( "CPU",
+                                    benchmark_func );
+}
+
+template< EntityDecomposerVersion DecomposerVersion,
+          typename M,
+          std::enable_if_t< M::Config::spaceDimension == 3 &&
+                           (std::is_same< typename M::Config::CellTopology, Topologies::Polygon >::value ||
+                            std::is_same< typename M::Config::CellTopology, Topologies::Polyhedron >::value ), bool > = true >
+static void benchmark_planar( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const M & mesh_src )
+{
+   if( ! checkDevice< Devices::Host >( parameters ) )
+      return;
+
+   auto benchmark_func = [&] () {
+      auto meshBuilder = planarCorrection< DecomposerVersion >( mesh_src );
+   };
+
+   benchmark.time< Devices::Host >( "CPU",
+                                    benchmark_func );
+}
+
+
+struct ReaderDispatch
+{
+   static void exec( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, std::shared_ptr< MeshReader > reader )
+   {
+      benchmark.setOperation( String( "Reader" ) );
+      benchmark_reader( benchmark, parameters, reader );
+   }
+};
+
+template< typename Mesh >
+struct InitDispatch
+{
+   static void exec( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, std::shared_ptr< MeshReader > reader )
+   {
+      benchmark.setOperation( String( "Init" ) );
+      benchmark_init< Mesh >( benchmark, parameters, reader );
+   }
+};
+
+struct CopyDispatch
+{
+   template< typename M >
+   static void exec( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const M & mesh )
+   {
+      benchmark.setOperation( String("Copy CPU->CPU") );
+      benchmark_copy< Devices::Host, Devices::Host >( benchmark, parameters, mesh );
+#ifdef HAVE_CUDA
+      benchmark.setOperation( String("Copy CPU->GPU") );
+      benchmark_copy< Devices::Host, Devices::Cuda >( benchmark, parameters, mesh );
+      benchmark.setOperation( String("Copy GPU->CPU") );
+      benchmark_copy< Devices::Cuda, Devices::Host >( benchmark, parameters, mesh );
+      benchmark.setOperation( String("Copy GPU->GPU") );
+      benchmark_copy< Devices::Cuda, Devices::Cuda >( benchmark, parameters, mesh );
+#endif
+   }
+};
 
 template< int EntityDimension >
 struct CentersDispatch
@@ -379,9 +519,78 @@ struct SpheresDispatch
    }
 };
 
+struct DecompositionDispatch
+{
+   // Polygonal Mesh
+   template< typename M,
+             std::enable_if_t< std::is_same< typename M::Config::CellTopology, Topologies::Polygon >::value, bool > = true >
+   static void exec( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const M & mesh_src )
+   {
+      benchmark.setOperation( String( "Decomposition (c)" ) );
+      benchmark_decomposition< EntityDecomposerVersion::ConnectEdgesToCentroid >( benchmark, parameters, mesh_src );
+
+      benchmark.setOperation( String( "Decomposition (p)" ) );
+      benchmark_decomposition< EntityDecomposerVersion::ConnectEdgesToPoint >( benchmark, parameters, mesh_src );
+   }
+
+   // Polyhedral Mesh
+   template< typename M,
+             std::enable_if_t< std::is_same< typename M::Config::CellTopology, Topologies::Polyhedron >::value, bool  > = true >
+   static void exec( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const M & mesh_src )
+   {
+      benchmark.setOperation( String( "Decomposition (cc)" ) );
+      benchmark_decomposition< EntityDecomposerVersion::ConnectEdgesToCentroid,
+                               EntityDecomposerVersion::ConnectEdgesToCentroid >( benchmark, parameters, mesh_src );
+
+      benchmark.setOperation( String( "Decomposition (cp)" ) );
+      benchmark_decomposition< EntityDecomposerVersion::ConnectEdgesToCentroid,
+                               EntityDecomposerVersion::ConnectEdgesToPoint >( benchmark, parameters, mesh_src );
+
+      benchmark.setOperation( String( "Decomposition (pc)" ) );
+      benchmark_decomposition< EntityDecomposerVersion::ConnectEdgesToPoint,
+                               EntityDecomposerVersion::ConnectEdgesToCentroid >( benchmark, parameters, mesh_src );
+
+      benchmark.setOperation( String( "Decomposition (pp)" ) );
+      benchmark_decomposition< EntityDecomposerVersion::ConnectEdgesToPoint,
+                               EntityDecomposerVersion::ConnectEdgesToPoint >( benchmark, parameters, mesh_src );
+   }
+
+   // Other than Polygonal and Polyhedral Mesh
+   template< typename M,
+             std::enable_if_t< ! std::is_same< typename M::Config::CellTopology, Topologies::Polygon >::value &&
+                               ! std::is_same< typename M::Config::CellTopology, Topologies::Polyhedron >::value, bool  > = true >
+   static void exec( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const M & mesh_src )
+   {
+   }
+};
+
+struct PlanarDispatch
+{
+   template< typename M,
+             std::enable_if_t< M::Config::spaceDimension == 3 &&
+                              (std::is_same< typename M::Config::CellTopology, Topologies::Polygon >::value ||
+                               std::is_same< typename M::Config::CellTopology, Topologies::Polyhedron >::value ), bool > = true >
+   static void exec( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const M & mesh_src )
+   {
+      benchmark.setOperation( String( "Planar Correction (c)" ) );
+      benchmark_planar< EntityDecomposerVersion::ConnectEdgesToCentroid >( benchmark, parameters, mesh_src );
+
+      benchmark.setOperation( String( "Planar Correction (p)" ) );
+      benchmark_planar< EntityDecomposerVersion::ConnectEdgesToPoint >( benchmark, parameters, mesh_src );
+   }
+
+   template< typename M,
+             std::enable_if_t< M::Config::spaceDimension < 3 ||
+                              (! std::is_same< typename M::Config::CellTopology, Topologies::Polygon >::value &&
+                               ! std::is_same< typename M::Config::CellTopology, Topologies::Polyhedron >::value ), bool > = true >
+   static void exec( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const M & mesh_src )
+   {
+   }
+};
+
 
 template< typename Mesh >
-void dispatchBenchmarks( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const Mesh & mesh )
+void dispatchBenchmarks( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const Mesh & mesh, std::shared_ptr< MeshReader > reader )
 {
    // collect memory usage
    // TODO: combine the results of memory usage and timings of the following algorithms
@@ -389,6 +598,12 @@ void dispatchBenchmarks( Benchmark<> & benchmark, const Config::ParameterContain
 //   auto noop = [](){};
 //   benchmark.time< TNL::Devices::Host >( "CPU", noop, meminfo );
 
+   // generic operations
+   ReaderDispatch::exec( benchmark, parameters, reader );
+   InitDispatch< Mesh >::exec( benchmark, parameters, reader );
+   CopyDispatch::exec( benchmark, parameters, mesh );
+
+   // general computations on unstructured mesh
    Algorithms::staticFor< int, 1, Mesh::getMeshDimension() + 1 >(
          [&] ( auto dim ) {
             CentersDispatch< dim >::exec( benchmark, parameters, mesh );
@@ -401,4 +616,8 @@ void dispatchBenchmarks( Benchmark<> & benchmark, const Config::ParameterContain
       );
    DualMeasuresDispatch::exec( benchmark, parameters, mesh );
    SpheresDispatch::exec( benchmark, parameters, mesh );
+
+   // computations on polygonal/polyhedral mesh
+   DecompositionDispatch::exec( benchmark, parameters, mesh );
+   PlanarDispatch::exec( benchmark, parameters, mesh );
 }

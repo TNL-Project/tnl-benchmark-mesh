@@ -51,9 +51,14 @@ run( Benchmark<> & benchmark,
    };
    benchmark.setMetadataColumns( metadataColumns );
 
+   auto reader = getMeshReader( meshFile, "auto" );
    MeshType mesh;
-   if( ! loadMesh( mesh, meshFile ) ) {
-      benchmark.addErrorMessage( "Failed to load mesh from file '" + meshFile );
+
+   try {
+      reader->loadMesh( mesh );
+   }
+   catch( const Meshes::Readers::MeshReaderError& e ) {
+      std::cerr << "Failed to load mesh from file '" << meshFile << "'." << std::endl;
       return false;
    }
 
@@ -61,7 +66,7 @@ run( Benchmark<> & benchmark,
    cudaProfilerStart();
 #endif
 
-   dispatchBenchmarks( benchmark, parameters, mesh );
+   dispatchBenchmarks( benchmark, parameters, mesh, reader );
 
 #ifdef HAVE_CUDA
    cudaProfilerStop();
