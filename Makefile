@@ -11,8 +11,21 @@ CUDA_SOURCES = tnl-benchmark-mesh-cuda.cu $(MESH_BENCHMARK_TEMPLATES_CU)
 # include general rules
 include Makefile.base
 
+# enable OpenMP
 CXXFLAGS += $(OPENMP_CXXFLAGS)
 LDLIBS += $(OPENMP_LDLIBS)
+
+# enable zlib
+CPPFLAGS += -DHAVE_ZLIB
+LDLIBS += -lz
+CUDA_CPPFLAGS += -DHAVE_ZLIB
+CUDA_LDLIBS += -lz
+
+# enable TinyXML2
+CPPFLAGS += -DHAVE_TINYXML2
+LDLIBS += -ltinyxml2
+CUDA_CPPFLAGS += -DHAVE_TINYXML2
+CUDA_LDLIBS += -ltinyxml2
 
 # aggregation rules for tnl-benchmark-mesh
 host: tnl-benchmark-mesh
