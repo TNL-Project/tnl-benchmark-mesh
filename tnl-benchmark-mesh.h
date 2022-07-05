@@ -6,8 +6,6 @@
 #include <TNL/Cuda/DeviceInfo.h>
 
 #include "MeshBenchmarksRunner.h"
-#include "TNL/Meshes/Topologies/Polygon.h"
-#include "TNL/Meshes/Topologies/Polyhedron.h"
 
 using namespace TNL;
 using namespace TNL::Meshes;
@@ -43,15 +41,25 @@ resolveCellTopology( Benchmark<> & benchmark,
                      const Config::ParameterContainer & parameters )
 {
    const String & meshFile = parameters.getParameter< String >( "mesh-file" );
-   Readers::VTKReader reader( meshFile );
-   reader.detectMesh();
-   if( reader.getMeshType() != "Meshes::Mesh" ) {
-      std::cerr << "The mesh type " << reader.getMeshType() << " is not supported in the VTK reader." << std::endl;
+
+   auto reader = getMeshReader( meshFile, "auto" );
+
+   try {
+      reader->detectMesh();
+   }
+   catch( const Meshes::Readers::MeshReaderError& e ) {
+      std::cerr << "Failed to detect mesh from file '" << meshFile << "'." << std::endl;
+      std::cerr << e.what() << std::endl;
+      return false;
+   }
+
+   if( reader->getMeshType() != "Meshes::Mesh" ) {
+      std::cerr << "The mesh type " << reader->getMeshType() << " is not supported." << std::endl;
       return false;
    }
 
    using VTK::EntityShape;
-   switch( reader.getCellShape() )
+   switch( reader->getCellShape() )
    {
       case EntityShape::Line:
          return setMeshParameters< Topologies::Edge >( benchmark, parameters );
@@ -68,7 +76,7 @@ resolveCellTopology( Benchmark<> & benchmark,
       case EntityShape::Polyhedron:
          return setMeshParameters< Topologies::Polyhedron >( benchmark, parameters );
       default:
-         std::cerr << "unsupported cell topology: " << getShapeName(reader.getCellShape()) << std::endl;
+         std::cerr << "unsupported cell topology: " << getShapeName(reader->getCellShape()) << std::endl;
          return false;
    }
 }
