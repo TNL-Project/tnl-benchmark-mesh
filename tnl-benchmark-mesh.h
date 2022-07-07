@@ -11,74 +11,19 @@ using namespace TNL;
 using namespace TNL::Meshes;
 using namespace TNL::Benchmarks;
 
-template< typename CellTopology,
-          int SpaceDimension = CellTopology::dimension,
-          typename... Params >
+template< typename... Params >
 bool
 setMeshParameters( Params&&... params )
 {
-   bool status = MeshBenchmarksRunner< MinimalConfig, CellTopology, SpaceDimension, float, int, short int >::run( std::forward<Params>(params)... ) &&
-                 MeshBenchmarksRunner< MinimalConfig, CellTopology, SpaceDimension, float, int, int >::run( std::forward<Params>(params)... ) &&
-                 MeshBenchmarksRunner< MinimalConfig, CellTopology, SpaceDimension, float, long int, short int >::run( std::forward<Params>(params)... ) &&
-                 MeshBenchmarksRunner< MinimalConfig, CellTopology, SpaceDimension, float, long int, int >::run( std::forward<Params>(params)... ) &&
-                 MeshBenchmarksRunner< MinimalConfig, CellTopology, SpaceDimension, double, int, short int >::run( std::forward<Params>(params)... ) &&
-                 MeshBenchmarksRunner< MinimalConfig, CellTopology, SpaceDimension, double, int, int >::run( std::forward<Params>(params)... ) &&
-                 MeshBenchmarksRunner< MinimalConfig, CellTopology, SpaceDimension, double, long int, short int >::run( std::forward<Params>(params)... ) &&
-                 MeshBenchmarksRunner< MinimalConfig, CellTopology, SpaceDimension, double, long int, int >::run( std::forward<Params>(params)... ) &&
-                 MeshBenchmarksRunner< FullConfig, CellTopology, SpaceDimension, float, int, short int >::run( std::forward<Params>(params)... ) &&
-                 MeshBenchmarksRunner< FullConfig, CellTopology, SpaceDimension, float, int, int >::run( std::forward<Params>(params)... ) &&
-                 MeshBenchmarksRunner< FullConfig, CellTopology, SpaceDimension, float, long int, short int >::run( std::forward<Params>(params)... ) &&
-                 MeshBenchmarksRunner< FullConfig, CellTopology, SpaceDimension, float, long int, int >::run( std::forward<Params>(params)... ) &&
-                 MeshBenchmarksRunner< FullConfig, CellTopology, SpaceDimension, double, int, short int >::run( std::forward<Params>(params)... ) &&
-                 MeshBenchmarksRunner< FullConfig, CellTopology, SpaceDimension, double, int, int >::run( std::forward<Params>(params)... ) &&
-                 MeshBenchmarksRunner< FullConfig, CellTopology, SpaceDimension, double, long int, short int >::run( std::forward<Params>(params)... ) &&
-                 MeshBenchmarksRunner< FullConfig, CellTopology, SpaceDimension, double, long int, int >::run( std::forward<Params>(params)... );
+   bool status = MeshBenchmarksRunner< float, int, short int >::run( std::forward<Params>(params)... ) &&
+                 MeshBenchmarksRunner< float, int, int >::run( std::forward<Params>(params)... ) &&
+                 MeshBenchmarksRunner< float, long int, short int >::run( std::forward<Params>(params)... ) &&
+                 MeshBenchmarksRunner< float, long int, int >::run( std::forward<Params>(params)... ) &&
+                 MeshBenchmarksRunner< double, int, short int >::run( std::forward<Params>(params)... ) &&
+                 MeshBenchmarksRunner< double, int, int >::run( std::forward<Params>(params)... ) &&
+                 MeshBenchmarksRunner< double, long int, short int >::run( std::forward<Params>(params)... ) &&
+                 MeshBenchmarksRunner< double, long int, int >::run( std::forward<Params>(params)... );
    return status;
-}
-
-bool
-resolveCellTopology( Benchmark<> & benchmark,
-                     const Config::ParameterContainer & parameters )
-{
-   const String & meshFile = parameters.getParameter< String >( "mesh-file" );
-
-   auto reader = getMeshReader( meshFile, "auto" );
-
-   try {
-      reader->detectMesh();
-   }
-   catch( const Meshes::Readers::MeshReaderError& e ) {
-      std::cerr << "Failed to detect mesh from file '" << meshFile << "'." << std::endl;
-      std::cerr << e.what() << std::endl;
-      return false;
-   }
-
-   if( reader->getMeshType() != "Meshes::Mesh" ) {
-      std::cerr << "The mesh type " << reader->getMeshType() << " is not supported." << std::endl;
-      return false;
-   }
-
-   using VTK::EntityShape;
-   switch( reader->getCellShape() )
-   {
-      case EntityShape::Line:
-         return setMeshParameters< Topologies::Edge >( benchmark, parameters );
-      case EntityShape::Triangle:
-         return setMeshParameters< Topologies::Triangle >( benchmark, parameters );
-///      case EntityShape::Quad:
-///         return setMeshParameters< Topologies::Quadrangle >( benchmark, parameters );
-      case EntityShape::Polygon:
-         return setMeshParameters< Topologies::Polygon >( benchmark, parameters );
-      case EntityShape::Tetra:
-         return setMeshParameters< Topologies::Tetrahedron >( benchmark, parameters );
-//      case EntityShape::Hexahedron:
-//         return setMeshParameters< Topologies::Hexahedron >( benchmark, parameters );
-      case EntityShape::Polyhedron:
-         return setMeshParameters< Topologies::Polyhedron >( benchmark, parameters );
-      default:
-         std::cerr << "unsupported cell topology: " << getShapeName(reader->getCellShape()) << std::endl;
-         return false;
-   }
 }
 
 void
@@ -136,7 +81,7 @@ main( int argc, char* argv[] )
    std::map< std::string, std::string > metadata = getHardwareMetadata();
    writeMapAsJson( metadata, logFileName + ".log", ".metadata.json" );
 
-   if( ! resolveCellTopology( benchmark, parameters ) )
+   if( ! setMeshParameters( benchmark, parameters ) )
       return EXIT_FAILURE;
 
    return EXIT_SUCCESS;

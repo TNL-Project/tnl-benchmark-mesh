@@ -9,33 +9,15 @@
 
 template< template< typename, int, typename, typename, typename > class ConfigTemplate,
           typename CellTopology,
-          int SpaceDimension,
-          typename Real,
-          typename GlobalIndex,
-          typename LocalIndex >
-struct MeshBenchmarksRunner
-{
-    // IMPORTANT NOTE:
-    // The definition of the method must be separate from its declaration,
-    // otherwise the compiler would always do implicit instead of explicit
-    // instantiation.
-    static bool
-    run( Benchmark<> & benchmark,
-         const Config::ParameterContainer & parameters );
-};
-
-template< template< typename, int, typename, typename, typename > class ConfigTemplate,
-          typename CellTopology,
-          int SpaceDimension,
           typename Real,
           typename GlobalIndex,
           typename LocalIndex >
 bool
-MeshBenchmarksRunner< ConfigTemplate,  CellTopology, SpaceDimension, Real, GlobalIndex, LocalIndex >::
-run( Benchmark<> & benchmark,
-     const Config::ParameterContainer & parameters )
+dispatch( Benchmark<> & benchmark,
+          const Config::ParameterContainer & parameters,
+          std::shared_ptr< MeshReader > reader )
 {
-   using Config = ConfigTemplate< CellTopology, SpaceDimension, Real, GlobalIndex, LocalIndex >;
+   using Config = ConfigTemplate< CellTopology, CellTopology::dimension, Real, GlobalIndex, LocalIndex >;
    using MeshType = Mesh< Config, Devices::Host >;
 
    const String & meshFile = parameters.getParameter< String >( "mesh-file" );
@@ -51,13 +33,11 @@ run( Benchmark<> & benchmark,
    };
    benchmark.setMetadataColumns( metadataColumns );
 
-   auto reader = getMeshReader( meshFile, "auto" );
    MeshType mesh;
-
    try {
       reader->loadMesh( mesh );
    }
-   catch( const Meshes::Readers::MeshReaderError& e ) {
+   catch( const MeshReaderError& e ) {
       std::cerr << "Failed to load mesh from file '" << meshFile << "'." << std::endl;
       return false;
    }
@@ -75,92 +55,86 @@ run( Benchmark<> & benchmark,
    return true;
 }
 
-extern template struct MeshBenchmarksRunner< FullConfig, Topologies::Edge, 1, float, int, short int >;
-extern template struct MeshBenchmarksRunner< FullConfig, Topologies::Edge, 1, float, int, int >;
-extern template struct MeshBenchmarksRunner< FullConfig, Topologies::Edge, 1, float, long int, short int >;
-extern template struct MeshBenchmarksRunner< FullConfig, Topologies::Edge, 1, float, long int, int >;
-extern template struct MeshBenchmarksRunner< FullConfig, Topologies::Edge, 1, double, int, short int >;
-extern template struct MeshBenchmarksRunner< FullConfig, Topologies::Edge, 1, double, int, int >;
-extern template struct MeshBenchmarksRunner< FullConfig, Topologies::Edge, 1, double, long int, short int >;
-extern template struct MeshBenchmarksRunner< FullConfig, Topologies::Edge, 1, double, long int, int >;
+template< template< typename, int, typename, typename, typename > class ConfigTemplate,
+          typename Real,
+          typename GlobalIndex,
+          typename LocalIndex >
+bool
+resolveCellTopology( Benchmark<> & benchmark,
+                     const Config::ParameterContainer & parameters )
+{
+   const String & meshFile = parameters.getParameter< String >( "mesh-file" );
 
-extern template struct MeshBenchmarksRunner< FullConfig, Topologies::Triangle, 2, float, int, short int >;
-extern template struct MeshBenchmarksRunner< FullConfig, Topologies::Triangle, 2, float, int, int >;
-extern template struct MeshBenchmarksRunner< FullConfig, Topologies::Triangle, 2, float, long int, short int >;
-extern template struct MeshBenchmarksRunner< FullConfig, Topologies::Triangle, 2, float, long int, int >;
-extern template struct MeshBenchmarksRunner< FullConfig, Topologies::Triangle, 2, double, int, short int >;
-extern template struct MeshBenchmarksRunner< FullConfig, Topologies::Triangle, 2, double, int, int >;
-extern template struct MeshBenchmarksRunner< FullConfig, Topologies::Triangle, 2, double, long int, short int >;
-extern template struct MeshBenchmarksRunner< FullConfig, Topologies::Triangle, 2, double, long int, int >;
+   auto reader = getMeshReader( meshFile, "auto" );
 
-extern template struct MeshBenchmarksRunner< FullConfig, Topologies::Polygon, 2, float, int, short int >;
-extern template struct MeshBenchmarksRunner< FullConfig, Topologies::Polygon, 2, float, int, int >;
-extern template struct MeshBenchmarksRunner< FullConfig, Topologies::Polygon, 2, float, long int, short int >;
-extern template struct MeshBenchmarksRunner< FullConfig, Topologies::Polygon, 2, float, long int, int >;
-extern template struct MeshBenchmarksRunner< FullConfig, Topologies::Polygon, 2, double, int, short int >;
-extern template struct MeshBenchmarksRunner< FullConfig, Topologies::Polygon, 2, double, int, int >;
-extern template struct MeshBenchmarksRunner< FullConfig, Topologies::Polygon, 2, double, long int, short int >;
-extern template struct MeshBenchmarksRunner< FullConfig, Topologies::Polygon, 2, double, long int, int >;
+   try {
+      reader->detectMesh();
+   }
+   catch( const MeshReaderError& e ) {
+      std::cerr << "Failed to detect mesh from file '" << meshFile << "'." << std::endl;
+      std::cerr << e.what() << std::endl;
+      return false;
+   }
 
-extern template struct MeshBenchmarksRunner< FullConfig, Topologies::Tetrahedron, 3, float, int, short int >;
-extern template struct MeshBenchmarksRunner< FullConfig, Topologies::Tetrahedron, 3, float, int, int >;
-extern template struct MeshBenchmarksRunner< FullConfig, Topologies::Tetrahedron, 3, float, long int, short int >;
-extern template struct MeshBenchmarksRunner< FullConfig, Topologies::Tetrahedron, 3, float, long int, int >;
-extern template struct MeshBenchmarksRunner< FullConfig, Topologies::Tetrahedron, 3, double, int, short int >;
-extern template struct MeshBenchmarksRunner< FullConfig, Topologies::Tetrahedron, 3, double, int, int >;
-extern template struct MeshBenchmarksRunner< FullConfig, Topologies::Tetrahedron, 3, double, long int, short int >;
-extern template struct MeshBenchmarksRunner< FullConfig, Topologies::Tetrahedron, 3, double, long int, int >;
+   if( reader->getMeshType() != "Meshes::Mesh" ) {
+      std::cerr << "The mesh type " << reader->getMeshType() << " is not supported." << std::endl;
+      return false;
+   }
 
-extern template struct MeshBenchmarksRunner< FullConfig, Topologies::Polyhedron, 3, float, int, short int >;
-extern template struct MeshBenchmarksRunner< FullConfig, Topologies::Polyhedron, 3, float, int, int >;
-extern template struct MeshBenchmarksRunner< FullConfig, Topologies::Polyhedron, 3, float, long int, short int >;
-extern template struct MeshBenchmarksRunner< FullConfig, Topologies::Polyhedron, 3, float, long int, int >;
-extern template struct MeshBenchmarksRunner< FullConfig, Topologies::Polyhedron, 3, double, int, short int >;
-extern template struct MeshBenchmarksRunner< FullConfig, Topologies::Polyhedron, 3, double, int, int >;
-extern template struct MeshBenchmarksRunner< FullConfig, Topologies::Polyhedron, 3, double, long int, short int >;
-extern template struct MeshBenchmarksRunner< FullConfig, Topologies::Polyhedron, 3, double, long int, int >;
+   using VTK::EntityShape;
+   switch( reader->getCellShape() )
+   {
+//      case EntityShape::Line:
+//         return dispatch< ConfigTemplate, Topologies::Edge, Real, GlobalIndex, LocalIndex >( benchmark, parameters, reader );
+      case EntityShape::Triangle:
+         return dispatch< ConfigTemplate, Topologies::Triangle, Real, GlobalIndex, LocalIndex >( benchmark, parameters, reader );
+//      case EntityShape::Quad:
+//         return dispatch< ConfigTemplate, Topologies::Quadrangle, Real, GlobalIndex, LocalIndex >( benchmark, parameters, reader );
+      case EntityShape::Polygon:
+         return dispatch< ConfigTemplate, Topologies::Polygon, Real, GlobalIndex, LocalIndex >( benchmark, parameters, reader );
+      case EntityShape::Tetra:
+         return dispatch< ConfigTemplate, Topologies::Tetrahedron, Real, GlobalIndex, LocalIndex >( benchmark, parameters, reader );
+//      case EntityShape::Hexahedron:
+//         return dispatch< ConfigTemplate, Topologies::Hexahedron, Real, GlobalIndex, LocalIndex >( benchmark, parameters, reader );
+      case EntityShape::Polyhedron:
+         return dispatch< ConfigTemplate, Topologies::Polyhedron, Real, GlobalIndex, LocalIndex >( benchmark, parameters, reader );
+      default:
+         std::cerr << "unsupported cell topology: " << getShapeName(reader->getCellShape()) << std::endl;
+         return false;
+   }
+}
 
-extern template struct MeshBenchmarksRunner< MinimalConfig, Topologies::Edge, 1, float, int, short int >;
-extern template struct MeshBenchmarksRunner< MinimalConfig, Topologies::Edge, 1, float, int, int >;
-extern template struct MeshBenchmarksRunner< MinimalConfig, Topologies::Edge, 1, float, long int, short int >;
-extern template struct MeshBenchmarksRunner< MinimalConfig, Topologies::Edge, 1, float, long int, int >;
-extern template struct MeshBenchmarksRunner< MinimalConfig, Topologies::Edge, 1, double, int, short int >;
-extern template struct MeshBenchmarksRunner< MinimalConfig, Topologies::Edge, 1, double, int, int >;
-extern template struct MeshBenchmarksRunner< MinimalConfig, Topologies::Edge, 1, double, long int, short int >;
-extern template struct MeshBenchmarksRunner< MinimalConfig, Topologies::Edge, 1, double, long int, int >;
+template< typename Real,
+          typename GlobalIndex,
+          typename LocalIndex >
+struct MeshBenchmarksRunner
+{
+    // IMPORTANT NOTE:
+    // The definition of the method must be separate from its declaration,
+    // otherwise the compiler would always do implicit instead of explicit
+    // instantiation.
+    static bool
+    run( Benchmark<> & benchmark,
+         const Config::ParameterContainer & parameters );
+};
 
-extern template struct MeshBenchmarksRunner< MinimalConfig, Topologies::Triangle, 2, float, int, short int >;
-extern template struct MeshBenchmarksRunner< MinimalConfig, Topologies::Triangle, 2, float, int, int >;
-extern template struct MeshBenchmarksRunner< MinimalConfig, Topologies::Triangle, 2, float, long int, short int >;
-extern template struct MeshBenchmarksRunner< MinimalConfig, Topologies::Triangle, 2, float, long int, int >;
-extern template struct MeshBenchmarksRunner< MinimalConfig, Topologies::Triangle, 2, double, int, short int >;
-extern template struct MeshBenchmarksRunner< MinimalConfig, Topologies::Triangle, 2, double, int, int >;
-extern template struct MeshBenchmarksRunner< MinimalConfig, Topologies::Triangle, 2, double, long int, short int >;
-extern template struct MeshBenchmarksRunner< MinimalConfig, Topologies::Triangle, 2, double, long int, int >;
+template< typename Real,
+          typename GlobalIndex,
+          typename LocalIndex >
+bool
+MeshBenchmarksRunner< Real, GlobalIndex, LocalIndex >::
+run( Benchmark<> & benchmark,
+     const Config::ParameterContainer & parameters )
+{
+   return resolveCellTopology< MinimalConfig, Real, GlobalIndex, LocalIndex >( benchmark, parameters ) &&
+          resolveCellTopology< FullConfig, Real, GlobalIndex, LocalIndex >( benchmark, parameters );
+}
 
-extern template struct MeshBenchmarksRunner< MinimalConfig, Topologies::Polygon, 2, float, int, short int >;
-extern template struct MeshBenchmarksRunner< MinimalConfig, Topologies::Polygon, 2, float, int, int >;
-extern template struct MeshBenchmarksRunner< MinimalConfig, Topologies::Polygon, 2, float, long int, short int >;
-extern template struct MeshBenchmarksRunner< MinimalConfig, Topologies::Polygon, 2, float, long int, int >;
-extern template struct MeshBenchmarksRunner< MinimalConfig, Topologies::Polygon, 2, double, int, short int >;
-extern template struct MeshBenchmarksRunner< MinimalConfig, Topologies::Polygon, 2, double, int, int >;
-extern template struct MeshBenchmarksRunner< MinimalConfig, Topologies::Polygon, 2, double, long int, short int >;
-extern template struct MeshBenchmarksRunner< MinimalConfig, Topologies::Polygon, 2, double, long int, int >;
-
-extern template struct MeshBenchmarksRunner< MinimalConfig, Topologies::Tetrahedron, 3, float, int, short int >;
-extern template struct MeshBenchmarksRunner< MinimalConfig, Topologies::Tetrahedron, 3, float, int, int >;
-extern template struct MeshBenchmarksRunner< MinimalConfig, Topologies::Tetrahedron, 3, float, long int, short int >;
-extern template struct MeshBenchmarksRunner< MinimalConfig, Topologies::Tetrahedron, 3, float, long int, int >;
-extern template struct MeshBenchmarksRunner< MinimalConfig, Topologies::Tetrahedron, 3, double, int, short int >;
-extern template struct MeshBenchmarksRunner< MinimalConfig, Topologies::Tetrahedron, 3, double, int, int >;
-extern template struct MeshBenchmarksRunner< MinimalConfig, Topologies::Tetrahedron, 3, double, long int, short int >;
-extern template struct MeshBenchmarksRunner< MinimalConfig, Topologies::Tetrahedron, 3, double, long int, int >;
-
-extern template struct MeshBenchmarksRunner< MinimalConfig, Topologies::Polyhedron, 3, float, int, short int >;
-extern template struct MeshBenchmarksRunner< MinimalConfig, Topologies::Polyhedron, 3, float, int, int >;
-extern template struct MeshBenchmarksRunner< MinimalConfig, Topologies::Polyhedron, 3, float, long int, short int >;
-extern template struct MeshBenchmarksRunner< MinimalConfig, Topologies::Polyhedron, 3, float, long int, int >;
-extern template struct MeshBenchmarksRunner< MinimalConfig, Topologies::Polyhedron, 3, double, int, short int >;
-extern template struct MeshBenchmarksRunner< MinimalConfig, Topologies::Polyhedron, 3, double, int, int >;
-extern template struct MeshBenchmarksRunner< MinimalConfig, Topologies::Polyhedron, 3, double, long int, short int >;
-extern template struct MeshBenchmarksRunner< MinimalConfig, Topologies::Polyhedron, 3, double, long int, int >;
+extern template struct MeshBenchmarksRunner< float, int, short int >;
+extern template struct MeshBenchmarksRunner< float, int, int >;
+extern template struct MeshBenchmarksRunner< float, long int, short int >;
+extern template struct MeshBenchmarksRunner< float, long int, int >;
+extern template struct MeshBenchmarksRunner< double, int, short int >;
+extern template struct MeshBenchmarksRunner< double, int, int >;
+extern template struct MeshBenchmarksRunner< double, long int, short int >;
+extern template struct MeshBenchmarksRunner< double, long int, int >;
