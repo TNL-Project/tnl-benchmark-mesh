@@ -137,17 +137,12 @@ struct MemoryBenchmarkResult
 
    virtual HeaderElements getTableHeader() const override
    {
-      return HeaderElements({ "time", "stddev", "stddev/time", "bandwidth", "speedup", "memory", "memstddev", "memstddev/memory" });
+      return HeaderElements({ "memory", "memstddev", "memstddev/memory" });
    }
 
    virtual RowElements getRowElements() const override
    {
       RowElements elements;
-      elements << time << stddev << stddev / time << bandwidth;
-      if( speedup != 0 )
-         elements << speedup;
-      else
-         elements << "N/A";
       elements << memory << memstddev << memstddev / memory;
       return elements;
    }

@@ -593,10 +593,10 @@ template< typename Mesh >
 void dispatchBenchmarks( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const Mesh & mesh, std::shared_ptr< MeshReader > reader )
 {
    // collect memory usage
-   // TODO: combine the results of memory usage and timings of the following algorithms
-//   MemoryBenchmarkResult meminfo = testMemoryUsage( parameters, mesh );
-//   auto noop = [](){};
-//   benchmark.time< TNL::Devices::Host >( "CPU", noop, meminfo );
+   benchmark.setOperation( "Memory requirements" );
+   MemoryBenchmarkResult meminfo = testMemoryUsage( parameters, mesh );
+   auto noop = [](){};
+   benchmark.time< Devices::Host >( "CPU", noop, meminfo );
 
    // generic operations
    ReaderDispatch::exec( benchmark, parameters, reader );
