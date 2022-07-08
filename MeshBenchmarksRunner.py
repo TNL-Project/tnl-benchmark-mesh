@@ -15,8 +15,12 @@ i = 0
 for line in open(src).readlines():
     if line.strip().startswith("extern template"):
         for ext in ["cpp", "cu"]:
-            out = open("{}/{}.t{}.{}".format(dirname, basename, i, ext), "w")
+            output_name = "{}/{}.t{}.{}".format(dirname, basename, i, ext)
+            out = open(output_name, "w")
             out.write("#include \"../{}.h\"\n".format(basename))
             out.write(line.strip().replace("extern ", "", 1))
             out.close()
+            # copy access and modification times from src to output_name
+            stat = os.stat(src)
+            os.utime(output_name, times=(stat.st_atime, stat.st_mtime))
         i += 1
