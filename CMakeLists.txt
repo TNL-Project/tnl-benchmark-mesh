@@ -43,7 +43,7 @@ set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
 # Set build flags for CUDA
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Wall -DHAVE_CUDA --expt-relaxed-constexpr --expt-extended-lambda --default-stream per-thread")
 set(CMAKE_CUDA_FLAGS_DEBUG "-g")
-set(CMAKE_CUDA_FLAGS_RELEASE "-O3 -DNDEBUG -march=native -mtune=native")
+set(CMAKE_CUDA_FLAGS_RELEASE "-O3 -DNDEBUG -Xcompiler -march=native -Xcompiler -mtune=native")
 set(CMAKE_CUDA_FLAGS_RELWITHDEBINFO "${CMAKE_CUDA_FLAGS_RELEASE} ${CMAKE_CUDA_FLAGS_DEBUG} --generate-line-info")
 # Disable false compiler warnings
 #   reference for the -Xcudafe --diag_suppress and --display_error_number flags: https://stackoverflow.com/a/54142937
