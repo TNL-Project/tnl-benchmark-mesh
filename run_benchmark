@@ -8,6 +8,10 @@ NCPUS=$(nproc)
 
 function run_benchmark()
 {
+    if (( $omp_threads > $NCPUS )); then
+        return
+    fi
+
     # set number of OpenMP threads
     omp_threads=${omp_threads:=1}
     if [[ "$omp_threads" == "1" ]]; then
@@ -16,10 +20,17 @@ function run_benchmark()
         omp_enabled=true
     fi
 
+    local base="$(basename "$mesh_file")"
+    if [[ "$base" = *.vtk ]]; then
+        base="${base%.vtk}"
+    elif [[ "$base" = *.vtu ]]; then
+        base="${base%.vtu}"
+    fi
+
     if [[ "$solver" =~ "cuda" ]]; then
-        log_file=log.CUDA_$(basename "$mesh_file" .vtk)
+        local log_file="log.CUDA_$base"
     else
-        log_file=log.OMP${omp_threads}_$(basename "$mesh_file" .vtk)
+        local log_file="log.OMP${omp_threads}_$base"
     fi
 
     local physcpubind="0-$(( $NCPUS - 1 ))"
@@ -43,28 +54,32 @@ function run_benchmark()
 
 function run_set()
 {
-    if (( $omp_threads > $NCPUS )); then
-        return
-    fi
-
-    for mesh_type in mrizka cube1m; do
-    for id in 1 2 3 4 5; do
-        [[ "$mesh_type" == "mrizka" ]] && id="$id.rcm"
-        mesh_file="./meshes/${mesh_type}_$id.vtk"
+    for mesh_file in "${meshes[@]}"; do
         run_benchmark
-    done
     done
 }
 
-#solver="./tnl-benchmark-mesh --devices host"
+# simplex meshes
+meshes=(
+    ./meshes/mrizka_{1..5}.rcm.vtk
+    ./meshes/cube1m_{1..5}.vtk
+)
+
+# polygonal/polyhedral meshes
+#meshes=(
+#    ./meshes/mrizka_{1..5}.dual.vtu
+#    ./meshes/cube1m_{1..5}.dual.vtu
+#)
+
+#solver="./build/tnl-benchmark-mesh --devices host"
 #omp_threads=1
 #run_set
 
-solver="./tnl-benchmark-mesh --devices host"
+solver="./build/tnl-benchmark-mesh --devices host"
 for omp_threads in 1 2 4 6 8 12; do
-   run_set
+    run_set
 done
 
-solver="./tnl-benchmark-mesh-cuda --devices cuda"
+solver="./build/tnl-benchmark-mesh-cuda --devices cuda"
 omp_threads=1
 run_set
