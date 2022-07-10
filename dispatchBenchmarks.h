@@ -1,5 +1,9 @@
 #pragma once
 
+#include <set>
+#include <sstream>
+#include <string>
+
 #include <TNL/Meshes/Grid.h>
 #include <TNL/Meshes/Mesh.h>
 #include <TNL/Meshes/Geometry/getEntityCenter.h>
@@ -19,6 +23,48 @@ using namespace TNL;
 using namespace TNL::Meshes;
 using namespace TNL::Meshes::Readers;
 using namespace TNL::Benchmarks;
+
+static const std::set< std::string > valid_benchmarks = {
+   "memory",
+   "reader",
+   "init",
+   "copy",
+   "centers",
+   "measures",
+   "dual-measures",
+   "spheres",
+   "decomposition",
+   "planar-correction",
+};
+
+static std::set< std::string >
+parse_comma_list( const Config::ParameterContainer& parameters,
+                  const char* parameter,
+                  const std::set< std::string >& options )
+{
+   const String param = parameters.getParameter< String >( parameter );
+
+   if( param == "all" )
+      return options;
+
+   std::stringstream ss( param.getString() );
+   std::string s;
+   std::set< std::string > set;
+
+   while( std::getline( ss, s, ',' ) ) {
+      if( ! options.count( s ) )
+         throw std::logic_error( std::string("Invalid value in the comma-separated list for the parameter '")
+                                 + parameter + "': '" + s + "'. The list contains: '" + param.getString() + "'." );
+
+      set.insert( s );
+
+      if( ss.peek() == ',' )
+         ss.ignore();
+   }
+
+   return set;
+}
+
 
 template< typename Real >
 __cuda_callable__
@@ -592,32 +638,47 @@ struct PlanarDispatch
 template< typename Mesh >
 void dispatchBenchmarks( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const Mesh & mesh, std::shared_ptr< MeshReader > reader )
 {
-   // collect memory usage
-   benchmark.setOperation( "Memory requirements" );
-   MemoryBenchmarkResult meminfo = testMemoryUsage( parameters, mesh );
-   auto noop = [](){};
-   benchmark.time< Devices::Host >( "CPU", noop, meminfo );
+   const std::set< std::string > benchmarks = parse_comma_list( parameters, "benchmarks", valid_benchmarks );
+
+   if( benchmarks.count( "memory" ) ) {
+      // collect memory usage
+      benchmark.setOperation( "Memory requirements" );
+      MemoryBenchmarkResult meminfo = testMemoryUsage( parameters, mesh );
+      auto noop = [](){};
+      benchmark.time< Devices::Host >( "CPU", noop, meminfo );
+   }
 
    // generic operations
-   ReaderDispatch::exec( benchmark, parameters, reader );
-   InitDispatch< Mesh >::exec( benchmark, parameters, reader );
-   CopyDispatch::exec( benchmark, parameters, mesh );
+   if( benchmarks.count( "reader" ) )
+      ReaderDispatch::exec( benchmark, parameters, reader );
+   if( benchmarks.count( "init" ) )
+      InitDispatch< Mesh >::exec( benchmark, parameters, reader );
+   if( benchmarks.count( "copy" ) )
+      CopyDispatch::exec( benchmark, parameters, mesh );
 
    // general computations on unstructured mesh
-   Algorithms::staticFor< int, 1, Mesh::getMeshDimension() + 1 >(
-         [&] ( auto dim ) {
-            CentersDispatch< dim >::exec( benchmark, parameters, mesh );
-         }
-      );
-   Algorithms::staticFor< int, 1, Mesh::getMeshDimension() + 1 >(
-         [&] ( auto dim ) {
-            MeasuresDispatch< dim >::exec( benchmark, parameters, mesh );
-         }
-      );
-   DualMeasuresDispatch::exec( benchmark, parameters, mesh );
-   SpheresDispatch::exec( benchmark, parameters, mesh );
+   if( benchmarks.count( "centers" ) ) {
+      Algorithms::staticFor< int, 1, Mesh::getMeshDimension() + 1 >(
+            [&] ( auto dim ) {
+               CentersDispatch< dim >::exec( benchmark, parameters, mesh );
+            }
+         );
+   }
+   if( benchmarks.count( "measures" ) ) {
+      Algorithms::staticFor< int, 1, Mesh::getMeshDimension() + 1 >(
+            [&] ( auto dim ) {
+               MeasuresDispatch< dim >::exec( benchmark, parameters, mesh );
+            }
+         );
+   }
+   if( benchmarks.count( "dual-measures" ) )
+      DualMeasuresDispatch::exec( benchmark, parameters, mesh );
+   if( benchmarks.count( "spheres" ) )
+      SpheresDispatch::exec( benchmark, parameters, mesh );
 
    // computations on polygonal/polyhedral mesh
-   DecompositionDispatch::exec( benchmark, parameters, mesh );
-   PlanarDispatch::exec( benchmark, parameters, mesh );
+   if( benchmarks.count( "decomposition" ) )
+      DecompositionDispatch::exec( benchmark, parameters, mesh );
+   if( benchmarks.count( "planar-correction" ) )
+      PlanarDispatch::exec( benchmark, parameters, mesh );
 }

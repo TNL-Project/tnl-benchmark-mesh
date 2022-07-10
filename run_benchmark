@@ -49,6 +49,7 @@ function run_benchmark()
         --log-file "$log_file" \
         --openmp-enabled "$omp_enabled" \
         --openmp-max-threads "$omp_threads" \
+        --benchmarks "$benchmarks" \
     || true
 }
 
@@ -58,6 +59,10 @@ function run_set()
         run_benchmark
     done
 }
+
+# benchmarks to run
+#benchmarks="all"
+benchmarks="measures"
 
 # simplex meshes
 meshes=(

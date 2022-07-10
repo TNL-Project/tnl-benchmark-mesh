@@ -26,6 +26,18 @@ setMeshParameters( Params&&... params )
    return status;
 }
 
+static std::string
+get_comma_list( const std::set< std::string >& options )
+{
+   std::string result;
+   for( const std::string& item : valid_benchmarks )
+      if( result.empty() )
+         result += item;
+      else
+         result += ", " + item;
+   return result;
+}
+
 void
 setupConfig( Config::ConfigDescription & config )
 {
@@ -43,6 +55,7 @@ setupConfig( Config::ConfigDescription & config )
    #ifdef HAVE_CUDA
    config.addEntryEnum( "cuda" );
    #endif
+   config.addEntry< String >( "benchmarks", "Comma-separated list of benchmarks to run. Options: " + get_comma_list( valid_benchmarks ), "all" );
 
    config.addDelimiter( "Device settings:" );
    Devices::Host::configSetup( config );
