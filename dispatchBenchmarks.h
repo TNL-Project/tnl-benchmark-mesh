@@ -31,7 +31,6 @@ static const std::set< std::string > valid_benchmarks = {
    "copy",
    "centers",
    "measures",
-   "dual-measures",
    "spheres",
    "decomposition",
    "planar-correction",
@@ -245,77 +244,6 @@ static void benchmark_measures( Benchmark<> & benchmark, const Config::Parameter
 }
 
 template< typename Device, typename Mesh >
-static void benchmark_dual_measures( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const Mesh & mesh_src )
-{
-   static_assert( std::is_same< typename Mesh::Config::CellTopology, Topologies::Edge >::value ||
-                  std::is_same< typename Mesh::Config::CellTopology, Topologies::Triangle >::value ||
-                  std::is_same< typename Mesh::Config::CellTopology, Topologies::Tetrahedron >::value,
-                  "The algorithm works only on simplices." );
-
-   using Real = typename Mesh::RealType;
-   using Index = typename Mesh::GlobalIndexType;
-   using LocalIndex = typename Mesh::LocalIndexType;
-   using PointType = typename Mesh::PointType;
-   using DeviceMesh = Meshes::Mesh< typename Mesh::Config, Device >;
-
-   // skip benchmarks on devices which the user did not select
-   if( ! checkDevice< Device >( parameters ) )
-      return;
-
-   const Index entitiesCount = mesh_src.template getEntitiesCount< Mesh::getMeshDimension() >();
-
-   const DeviceMesh mesh = mesh_src;
-   Pointers::DevicePointer< const DeviceMesh > meshPointer( mesh );
-   Containers::Array< Real, Device, Index > measures;
-   measures.setSize( entitiesCount );
-
-   auto kernel_measures = [] __cuda_callable__
-      ( Index i,
-        const DeviceMesh* mesh,
-        Real* array )
-   {
-      const auto& entity = mesh->template getEntity< Mesh::getMeshDimension() >( i );
-//      constexpr auto facesCount = Mesh::Cell::template getSubentitiesCount< Mesh::getMeshDimension() - 1 >();
-      constexpr auto facesCount = Mesh::Cell::template SubentityTraits< Mesh::getMeshDimension() - 1 >::count;
-      PointType centers[ facesCount ];
-
-      for( LocalIndex f = 0; f < facesCount; f++ ) {
-         const auto fid = entity.template getSubentityIndex< Mesh::getMeshDimension() - 1 >( f );
-         const auto& face = mesh->template getEntity< Mesh::getMeshDimension() - 1 >( fid );
-         const auto _cells = face.template getSuperentitiesCount< Mesh::getMeshDimension() >();
-         if( _cells == 1 )
-            // boundary face - take the face center instead of the neighbor
-            centers[ f ] = getEntityCenter( *mesh, face );
-         else for( LocalIndex c = 0; c < _cells; c++ ) {
-            const auto cid = face.template getSuperentityIndex< Mesh::getMeshDimension() >( c );
-            if( cid != i ) {
-               const auto& cell = mesh->template getEntity< Mesh::getMeshDimension() >( cid );
-               centers[ f ] = getEntityCenter( *mesh, cell );
-            }
-         }
-      }
-
-      array[ i ] = getSimplexMeasure( centers );
-   };
-
-   auto reset = [&]() {
-      measures.setValue( 0.0 );
-   };
-
-   auto benchmark_func = [&] () {
-      Algorithms::ParallelFor< Device >::exec(
-            (Index) 0, entitiesCount,
-            kernel_measures,
-            &meshPointer.template getData< Device >(),
-            measures.getData() );
-   };
-
-   benchmark.time< Device >( reset,
-                             (std::is_same< Device, Devices::Host >::value) ? "CPU" : "GPU",
-                             benchmark_func );
-}
-
-template< typename Device, typename Mesh >
 static void benchmark_spheres( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const Mesh & mesh_src )
 {
    static_assert( std::is_same< typename Mesh::Config::CellTopology, Topologies::Triangle >::value ||
@@ -509,35 +437,6 @@ struct MeasuresDispatch
    }
 };
 
-struct DualMeasuresDispatch
-{
-   template< typename M,
-             typename = typename std::enable_if<
-                           std::is_same< typename M::Config::CellTopology, Topologies::Edge >::value ||
-                           std::is_same< typename M::Config::CellTopology, Topologies::Triangle >::value ||
-                           std::is_same< typename M::Config::CellTopology, Topologies::Tetrahedron >::value
-                        >::type >
-   static void exec( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const M & mesh )
-   {
-      benchmark.setOperation( "Dual M" );
-      benchmark_dual_measures< Devices::Host >( benchmark, parameters, mesh );
-#ifdef HAVE_CUDA
-      benchmark_dual_measures< Devices::Cuda >( benchmark, parameters, mesh );
-#endif
-   }
-
-   template< typename M,
-             typename = typename std::enable_if< !(
-                           std::is_same< typename M::Config::CellTopology, Topologies::Edge >::value ||
-                           std::is_same< typename M::Config::CellTopology, Topologies::Triangle >::value ||
-                           std::is_same< typename M::Config::CellTopology, Topologies::Tetrahedron >::value
-                        ) >::type,
-             typename = void >
-   static void exec( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const M & mesh )
-   {
-   }
-};
-
 struct SpheresDispatch
 {
    template< typename M,
@@ -671,8 +570,6 @@ void dispatchBenchmarks( Benchmark<> & benchmark, const Config::ParameterContain
             }
          );
    }
-   if( benchmarks.count( "dual-measures" ) )
-      DualMeasuresDispatch::exec( benchmark, parameters, mesh );
    if( benchmarks.count( "spheres" ) )
       SpheresDispatch::exec( benchmark, parameters, mesh );
 
