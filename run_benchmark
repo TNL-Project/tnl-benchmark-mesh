@@ -62,7 +62,8 @@ function run_set()
 
 # benchmarks to run
 #benchmarks="all"
-benchmarks="measures"
+#benchmarks="measures,spheres"
+benchmarks="measures,boundary-measures"
 
 # simplex meshes
 meshes=(

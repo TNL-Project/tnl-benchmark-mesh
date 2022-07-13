@@ -31,6 +31,7 @@ static const std::set< std::string > valid_benchmarks = {
    "copy",
    "centers",
    "measures",
+   "boundary-measures",
    "spheres",
    "decomposition",
    "planar-correction",
@@ -244,6 +245,58 @@ static void benchmark_measures( Benchmark<> & benchmark, const Config::Parameter
 }
 
 template< typename Device, typename Mesh >
+static void benchmark_boundary_measures( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const Mesh & mesh_src )
+{
+   using Real = typename Mesh::RealType;
+   using Index = typename Mesh::GlobalIndexType;
+   using LocalIndex = typename Mesh::LocalIndexType;
+   using DeviceMesh = Meshes::Mesh< typename Mesh::Config, Device >;
+
+   // skip benchmarks on devices which the user did not select
+   if( ! checkDevice< Device >( parameters ) )
+      return;
+
+   const Index facesCount = mesh_src.template getEntitiesCount< Mesh::getMeshDimension() - 1 >();
+   const Index cellsCount = mesh_src.template getEntitiesCount< Mesh::getMeshDimension() >();
+
+   const DeviceMesh mesh = mesh_src;
+   Pointers::DevicePointer< const DeviceMesh > meshPointer( mesh );
+   Containers::Array< Real, Device, Index > boundary_measures;
+   boundary_measures.setSize( cellsCount );
+
+   auto kernel_boundary_measures = [] __cuda_callable__
+      ( Index fid,
+        const DeviceMesh* mesh,
+        Real* array )
+   {
+      const auto& face = mesh->template getEntity< Mesh::getMeshDimension() - 1 >( fid );
+      const auto face_measure = getEntityMeasure( *mesh, face );
+
+      const auto cellsCount = face.template getSuperentitiesCount< Mesh::getMeshDimension() >();
+      for( LocalIndex c = 0; c < cellsCount; c++ ) {
+         const auto cid = face.template getSuperentityIndex< Mesh::getMeshDimension() >( c );
+         Algorithms::AtomicOperations< Device >::add( array[ cid ], face_measure );
+      }
+   };
+
+   auto reset = [&]() {
+      boundary_measures.setValue( 0.0 );
+   };
+
+   auto benchmark_func = [&] () {
+      Algorithms::ParallelFor< Device >::exec(
+            (Index) 0, facesCount,
+            kernel_boundary_measures,
+            &meshPointer.template getData< Device >(),
+            boundary_measures.getData() );
+   };
+
+   benchmark.time< Device >( reset,
+                             (std::is_same< Device, Devices::Host >::value) ? "CPU" : "GPU",
+                             benchmark_func );
+}
+
+template< typename Device, typename Mesh >
 static void benchmark_spheres( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const Mesh & mesh_src )
 {
    static_assert( std::is_same< typename Mesh::Config::CellTopology, Topologies::Triangle >::value ||
@@ -264,7 +317,7 @@ static void benchmark_spheres( Benchmark<> & benchmark, const Config::ParameterC
 
    const DeviceMesh mesh = mesh_src;
    Pointers::DevicePointer< const DeviceMesh > meshPointer( mesh );
-   Containers::Vector< Real, Device, Index > spheres;
+   Containers::Array< Real, Device, Index > spheres;
    spheres.setSize( verticesCount );
 
    auto getLocalFaceIndex = [] __cuda_callable__
@@ -418,8 +471,7 @@ struct CentersDispatch
 template< int EntityDimension >
 struct MeasuresDispatch
 {
-   template< typename M,
-             typename = typename std::enable_if< M::Config::subentityStorage( M::getMeshDimension(), 0 ) >::type >
+   template< typename M >
    static void exec( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const M & mesh )
    {
       benchmark.setOperation( String("Measures (d = ") + convertToString(EntityDimension) + ")" );
@@ -428,12 +480,18 @@ struct MeasuresDispatch
       benchmark_measures< EntityDimension, Devices::Cuda >( benchmark, parameters, mesh );
 #endif
    }
+};
 
-   template< typename M,
-             typename = typename std::enable_if< ! M::Config::subentityStorage( M::getMeshDimension(), 0 ) >::type,
-             typename = void >
+struct BoundaryMeasuresDispatch
+{
+   template< typename M >
    static void exec( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const M & mesh )
    {
+      benchmark.setOperation( "Boundary measures" );
+      benchmark_boundary_measures< Devices::Host >( benchmark, parameters, mesh );
+#ifdef HAVE_CUDA
+      benchmark_boundary_measures< Devices::Cuda >( benchmark, parameters, mesh );
+#endif
    }
 };
 
@@ -570,6 +628,8 @@ void dispatchBenchmarks( Benchmark<> & benchmark, const Config::ParameterContain
             }
          );
    }
+   if( benchmarks.count( "boundary-measures" ) )
+      BoundaryMeasuresDispatch::exec( benchmark, parameters, mesh );
    if( benchmarks.count( "spheres" ) )
       SpheresDispatch::exec( benchmark, parameters, mesh );
 
