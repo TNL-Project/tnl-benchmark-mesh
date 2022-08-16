@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.23)
+cmake_minimum_required(VERSION 3.24)
 project(tnl-benchmark-mesh
     LANGUAGES CXX CUDA
 )
@@ -55,10 +55,8 @@ set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcudafe --diag_suppress=esa_on_defaul
 # Set CUDA architectures for which the executables will be compiled.
 # See https://cmake.org/cmake/help/latest/prop_tgt/CUDA_ARCHITECTURES.html
 if( NOT DEFINED CMAKE_CUDA_ARCHITECTURES )
-    # NOTE: "all" and "all-major" are available since CMake 3.23
-    set(CMAKE_CUDA_ARCHITECTURES "all-major")
-    # NOTE: "native" is available since CMake 3.24
-    #set(CMAKE_CUDA_ARCHITECTURES "native")
+    # NOTE: "all" and "all-major" are available since CMake 3.23, "native" is available since CMake 3.24
+    set(CMAKE_CUDA_ARCHITECTURES "native")
 endif()
 
 # Set up bundled dependencies
