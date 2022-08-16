@@ -21,7 +21,7 @@ with GPU support](https://doi.org/10.1145/3536164).
        cd tnl-benchmark-mesh
        python3 MeshBenchmarksRunner.py
        cmake -B build -S . -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release
-       make -C build
+       cmake --build build
 
 4. Run the script to execute the benchmarks on the meshes included in the repository:
 
