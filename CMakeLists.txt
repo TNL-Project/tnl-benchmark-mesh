@@ -3,9 +3,9 @@ project(tnl-benchmark-mesh
     LANGUAGES CXX CUDA
 )
 
-# Require C++14, and disable compiler-specific extensions (if possible).
+# Require C++17, and disable compiler-specific extensions (if possible).
 foreach(lang CXX CUDA)
-    set(CMAKE_${lang}_STANDARD 14)
+    set(CMAKE_${lang}_STANDARD 17)
     set(CMAKE_${lang}_STANDARD_REQUIRED ON)
     set(CMAKE_${lang}_EXTENSIONS OFF)
 endforeach()

@@ -12,7 +12,7 @@
 #include <TNL/Meshes/Geometry/getPlanarMesh.h>
 #include <TNL/Meshes/TypeResolver/resolveMeshType.h>
 #include <TNL/Pointers/DevicePointer.h>
-#include <TNL/Algorithms/ParallelFor.h>
+#include <TNL/Algorithms/parallelFor.h>
 #include <TNL/Algorithms/staticFor.h>
 #include <TNL/Benchmarks/Benchmarks.h>
 
@@ -188,8 +188,8 @@ void benchmark_centers( Benchmark<> & benchmark, const Config::ParameterContaine
    };
 
    auto benchmark_func = [&] () {
-      Algorithms::ParallelFor< Device >::exec(
-            (Index) 0, entitiesCount,
+      Algorithms::parallelFor< Device >(
+            0, entitiesCount,
             kernel_centers,
             &meshPointer.template getData< Device >(),
             centers.getData() );
@@ -232,8 +232,8 @@ static void benchmark_measures( Benchmark<> & benchmark, const Config::Parameter
    };
 
    auto benchmark_func = [&] () {
-      Algorithms::ParallelFor< Device >::exec(
-            (Index) 0, entitiesCount,
+      Algorithms::parallelFor< Device >(
+            0, entitiesCount,
             kernel_measures,
             &meshPointer.template getData< Device >(),
             measures.getData() );
@@ -284,8 +284,8 @@ static void benchmark_boundary_measures( Benchmark<> & benchmark, const Config::
    };
 
    auto benchmark_func = [&] () {
-      Algorithms::ParallelFor< Device >::exec(
-            (Index) 0, facesCount,
+      Algorithms::parallelFor< Device >(
+            0, facesCount,
             kernel_boundary_measures,
             &meshPointer.template getData< Device >(),
             boundary_measures.getData() );
@@ -361,8 +361,8 @@ static void benchmark_spheres( Benchmark<> & benchmark, const Config::ParameterC
    };
 
    auto benchmark_func = [&] () {
-      Algorithms::ParallelFor< Device >::exec(
-            (Index) 0, facesCount,
+      Algorithms::parallelFor< Device >(
+            0, facesCount,
             kernel_spheres,
             &meshPointer.template getData< Device >(),
             spheres.getData() );
@@ -409,49 +409,38 @@ static void benchmark_planar( Benchmark<> & benchmark, const Config::ParameterCo
 }
 
 
-struct ReaderDispatch
+static void ReaderDispatch( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, std::shared_ptr< MeshReader > reader )
 {
-   static void exec( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, std::shared_ptr< MeshReader > reader )
-   {
-      benchmark.setOperation( String( "Reader" ) );
-      benchmark_reader( benchmark, parameters, reader );
-   }
-};
+   benchmark.setOperation( String( "Reader" ) );
+   benchmark_reader( benchmark, parameters, reader );
+}
 
 template< typename Mesh >
-struct InitDispatch
+static void InitDispatch( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, std::shared_ptr< MeshReader > reader )
 {
-   static void exec( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, std::shared_ptr< MeshReader > reader )
-   {
-      benchmark.setOperation( String( "Init" ) );
-      benchmark_init< Mesh >( benchmark, parameters, reader );
-   }
-};
+   benchmark.setOperation( String( "Init" ) );
+   benchmark_init< Mesh >( benchmark, parameters, reader );
+}
 
-struct CopyDispatch
+template< typename M >
+static void CopyDispatch( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const M & mesh )
 {
-   template< typename M >
-   static void exec( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const M & mesh )
-   {
-      benchmark.setOperation( String("Copy CPU->CPU") );
-      benchmark_copy< Devices::Host, Devices::Host >( benchmark, parameters, mesh );
+   benchmark.setOperation( String("Copy CPU->CPU") );
+   benchmark_copy< Devices::Host, Devices::Host >( benchmark, parameters, mesh );
 #ifdef HAVE_CUDA
-      benchmark.setOperation( String("Copy CPU->GPU") );
-      benchmark_copy< Devices::Host, Devices::Cuda >( benchmark, parameters, mesh );
-      benchmark.setOperation( String("Copy GPU->CPU") );
-      benchmark_copy< Devices::Cuda, Devices::Host >( benchmark, parameters, mesh );
-      benchmark.setOperation( String("Copy GPU->GPU") );
-      benchmark_copy< Devices::Cuda, Devices::Cuda >( benchmark, parameters, mesh );
+   benchmark.setOperation( String("Copy CPU->GPU") );
+   benchmark_copy< Devices::Host, Devices::Cuda >( benchmark, parameters, mesh );
+   benchmark.setOperation( String("Copy GPU->CPU") );
+   benchmark_copy< Devices::Cuda, Devices::Host >( benchmark, parameters, mesh );
+   benchmark.setOperation( String("Copy GPU->GPU") );
+   benchmark_copy< Devices::Cuda, Devices::Cuda >( benchmark, parameters, mesh );
 #endif
-   }
-};
+}
 
-template< int EntityDimension >
-struct CentersDispatch
+template< int EntityDimension, typename M >
+static void CentersDispatch( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const M & mesh )
 {
-   template< typename M,
-             typename = typename std::enable_if< M::Config::subentityStorage( M::getMeshDimension(), 0 ) >::type >
-   static void exec( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const M & mesh )
+   if constexpr( M::Config::subentityStorage( M::getMeshDimension(), 0 ) )
    {
       benchmark.setOperation( String("Centers (d = ") + convertToString(EntityDimension) + ")" );
       benchmark_centers< EntityDimension, Devices::Host >( benchmark, parameters, mesh );
@@ -459,50 +448,33 @@ struct CentersDispatch
       benchmark_centers< EntityDimension, Devices::Cuda >( benchmark, parameters, mesh );
 #endif
    }
+}
 
-   template< typename M,
-             typename = typename std::enable_if< ! M::Config::subentityStorage( M::getMeshDimension(), 0 ) >::type,
-             typename = void >
-   static void exec( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const M & mesh )
-   {
-   }
-};
-
-template< int EntityDimension >
-struct MeasuresDispatch
+template< int EntityDimension, typename M >
+static void MeasuresDispatch( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const M & mesh )
 {
-   template< typename M >
-   static void exec( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const M & mesh )
-   {
-      benchmark.setOperation( String("Measures (d = ") + convertToString(EntityDimension) + ")" );
-      benchmark_measures< EntityDimension, Devices::Host >( benchmark, parameters, mesh );
+   benchmark.setOperation( String("Measures (d = ") + convertToString(EntityDimension) + ")" );
+   benchmark_measures< EntityDimension, Devices::Host >( benchmark, parameters, mesh );
 #ifdef HAVE_CUDA
-      benchmark_measures< EntityDimension, Devices::Cuda >( benchmark, parameters, mesh );
+   benchmark_measures< EntityDimension, Devices::Cuda >( benchmark, parameters, mesh );
 #endif
-   }
-};
+}
 
-struct BoundaryMeasuresDispatch
+template< typename M >
+static void BoundaryMeasuresDispatch( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const M & mesh )
 {
-   template< typename M >
-   static void exec( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const M & mesh )
-   {
-      benchmark.setOperation( "Boundary measures" );
-      benchmark_boundary_measures< Devices::Host >( benchmark, parameters, mesh );
+   benchmark.setOperation( "Boundary measures" );
+   benchmark_boundary_measures< Devices::Host >( benchmark, parameters, mesh );
 #ifdef HAVE_CUDA
-      benchmark_boundary_measures< Devices::Cuda >( benchmark, parameters, mesh );
+   benchmark_boundary_measures< Devices::Cuda >( benchmark, parameters, mesh );
 #endif
-   }
-};
+}
 
-struct SpheresDispatch
+template< typename M >
+static void SpheresDispatch( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const M & mesh )
 {
-   template< typename M,
-             typename = typename std::enable_if<
-                           std::is_same< typename M::Config::CellTopology, Topologies::Triangle >::value ||
-                           std::is_same< typename M::Config::CellTopology, Topologies::Tetrahedron >::value
-                        >::type >
-   static void exec( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const M & mesh )
+   if constexpr( std::is_same< typename M::Config::CellTopology, Topologies::Triangle >::value ||
+                  std::is_same< typename M::Config::CellTopology, Topologies::Tetrahedron >::value )
    {
       benchmark.setOperation( "Spheres" );
       benchmark_spheres< Devices::Host >( benchmark, parameters, mesh );
@@ -510,24 +482,13 @@ struct SpheresDispatch
       benchmark_spheres< Devices::Cuda >( benchmark, parameters, mesh );
 #endif
    }
+}
 
-   template< typename M,
-             typename = typename std::enable_if< !(
-                           std::is_same< typename M::Config::CellTopology, Topologies::Triangle >::value ||
-                           std::is_same< typename M::Config::CellTopology, Topologies::Tetrahedron >::value
-                        ) >::type,
-             typename = void >
-   static void exec( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const M & mesh )
-   {
-   }
-};
-
-struct DecompositionDispatch
+template< typename M >
+static void DecompositionDispatch( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const M & mesh_src )
 {
    // Polygonal Mesh
-   template< typename M,
-             std::enable_if_t< std::is_same< typename M::Config::CellTopology, Topologies::Polygon >::value, bool > = true >
-   static void exec( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const M & mesh_src )
+   if constexpr( std::is_same< typename M::Config::CellTopology, Topologies::Polygon >::value )
    {
       benchmark.setOperation( String( "Decomposition (c)" ) );
       benchmark_decomposition< EntityDecomposerVersion::ConnectEdgesToCentroid >( benchmark, parameters, mesh_src );
@@ -537,43 +498,32 @@ struct DecompositionDispatch
    }
 
    // Polyhedral Mesh
-   template< typename M,
-             std::enable_if_t< std::is_same< typename M::Config::CellTopology, Topologies::Polyhedron >::value, bool  > = true >
-   static void exec( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const M & mesh_src )
+   if constexpr( std::is_same< typename M::Config::CellTopology, Topologies::Polyhedron >::value )
    {
       benchmark.setOperation( String( "Decomposition (cc)" ) );
       benchmark_decomposition< EntityDecomposerVersion::ConnectEdgesToCentroid,
-                               EntityDecomposerVersion::ConnectEdgesToCentroid >( benchmark, parameters, mesh_src );
+                                 EntityDecomposerVersion::ConnectEdgesToCentroid >( benchmark, parameters, mesh_src );
 
       benchmark.setOperation( String( "Decomposition (cp)" ) );
       benchmark_decomposition< EntityDecomposerVersion::ConnectEdgesToCentroid,
-                               EntityDecomposerVersion::ConnectEdgesToPoint >( benchmark, parameters, mesh_src );
+                                 EntityDecomposerVersion::ConnectEdgesToPoint >( benchmark, parameters, mesh_src );
 
       benchmark.setOperation( String( "Decomposition (pc)" ) );
       benchmark_decomposition< EntityDecomposerVersion::ConnectEdgesToPoint,
-                               EntityDecomposerVersion::ConnectEdgesToCentroid >( benchmark, parameters, mesh_src );
+                                 EntityDecomposerVersion::ConnectEdgesToCentroid >( benchmark, parameters, mesh_src );
 
       benchmark.setOperation( String( "Decomposition (pp)" ) );
       benchmark_decomposition< EntityDecomposerVersion::ConnectEdgesToPoint,
-                               EntityDecomposerVersion::ConnectEdgesToPoint >( benchmark, parameters, mesh_src );
+                                 EntityDecomposerVersion::ConnectEdgesToPoint >( benchmark, parameters, mesh_src );
    }
+}
 
-   // Other than Polygonal and Polyhedral Mesh
-   template< typename M,
-             std::enable_if_t< ! std::is_same< typename M::Config::CellTopology, Topologies::Polygon >::value &&
-                               ! std::is_same< typename M::Config::CellTopology, Topologies::Polyhedron >::value, bool  > = true >
-   static void exec( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const M & mesh_src )
-   {
-   }
-};
-
-struct PlanarDispatch
+template< typename M >
+static void PlanarDispatch( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const M & mesh_src )
 {
-   template< typename M,
-             std::enable_if_t< M::Config::spaceDimension == 3 &&
-                              (std::is_same< typename M::Config::CellTopology, Topologies::Polygon >::value ||
-                               std::is_same< typename M::Config::CellTopology, Topologies::Polyhedron >::value ), bool > = true >
-   static void exec( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const M & mesh_src )
+   if constexpr( M::Config::spaceDimension == 3 &&
+                  (std::is_same< typename M::Config::CellTopology, Topologies::Polygon >::value ||
+                  std::is_same< typename M::Config::CellTopology, Topologies::Polyhedron >::value ) )
    {
       benchmark.setOperation( String( "Planar Correction (c)" ) );
       benchmark_planar< EntityDecomposerVersion::ConnectEdgesToCentroid >( benchmark, parameters, mesh_src );
@@ -581,15 +531,7 @@ struct PlanarDispatch
       benchmark.setOperation( String( "Planar Correction (p)" ) );
       benchmark_planar< EntityDecomposerVersion::ConnectEdgesToPoint >( benchmark, parameters, mesh_src );
    }
-
-   template< typename M,
-             std::enable_if_t< M::Config::spaceDimension < 3 ||
-                              (! std::is_same< typename M::Config::CellTopology, Topologies::Polygon >::value &&
-                               ! std::is_same< typename M::Config::CellTopology, Topologies::Polyhedron >::value ), bool > = true >
-   static void exec( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const M & mesh_src )
-   {
-   }
-};
+}
 
 
 template< typename Mesh >
@@ -607,35 +549,35 @@ void dispatchBenchmarks( Benchmark<> & benchmark, const Config::ParameterContain
 
    // generic operations
    if( benchmarks.count( "reader" ) )
-      ReaderDispatch::exec( benchmark, parameters, reader );
+      ReaderDispatch( benchmark, parameters, reader );
    if( benchmarks.count( "init" ) )
-      InitDispatch< Mesh >::exec( benchmark, parameters, reader );
+      InitDispatch< Mesh >( benchmark, parameters, reader );
    if( benchmarks.count( "copy" ) )
-      CopyDispatch::exec( benchmark, parameters, mesh );
+      CopyDispatch( benchmark, parameters, mesh );
 
    // general computations on unstructured mesh
    if( benchmarks.count( "centers" ) ) {
       Algorithms::staticFor< int, 1, Mesh::getMeshDimension() + 1 >(
             [&] ( auto dim ) {
-               CentersDispatch< dim >::exec( benchmark, parameters, mesh );
+               CentersDispatch< dim >( benchmark, parameters, mesh );
             }
          );
    }
    if( benchmarks.count( "measures" ) ) {
       Algorithms::staticFor< int, 1, Mesh::getMeshDimension() + 1 >(
             [&] ( auto dim ) {
-               MeasuresDispatch< dim >::exec( benchmark, parameters, mesh );
+               MeasuresDispatch< dim >( benchmark, parameters, mesh );
             }
          );
    }
    if( benchmarks.count( "boundary-measures" ) )
-      BoundaryMeasuresDispatch::exec( benchmark, parameters, mesh );
+      BoundaryMeasuresDispatch( benchmark, parameters, mesh );
    if( benchmarks.count( "spheres" ) )
-      SpheresDispatch::exec( benchmark, parameters, mesh );
+      SpheresDispatch( benchmark, parameters, mesh );
 
    // computations on polygonal/polyhedral mesh
    if( benchmarks.count( "decomposition" ) )
-      DecompositionDispatch::exec( benchmark, parameters, mesh );
+      DecompositionDispatch( benchmark, parameters, mesh );
    if( benchmarks.count( "planar-correction" ) )
-      PlanarDispatch::exec( benchmark, parameters, mesh );
+      PlanarDispatch( benchmark, parameters, mesh );
 }
