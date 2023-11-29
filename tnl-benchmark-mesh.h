@@ -3,7 +3,6 @@
 #include <TNL/Config/parseCommandLine.h>
 #include <TNL/Devices/Host.h>
 #include <TNL/Devices/Cuda.h>
-#include <TNL/Cuda/DeviceInfo.h>
 
 #include "MeshBenchmarksRunner.h"
 

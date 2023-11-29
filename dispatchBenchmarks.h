@@ -332,8 +332,7 @@ static void benchmark_spheres( Benchmark<> & benchmark, const Config::ParameterC
             return f;
          }
       }
-      TNL_ASSERT( false,
-                  std::cerr << "local face index not found -- this is a BUG!" << std::endl; );
+      TNL_ASSERT_TRUE( false, "local face index not found -- this is a BUG!" );
       return (LocalIndex) 0;
    };
 
