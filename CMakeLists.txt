@@ -33,7 +33,7 @@ if( NOT DEFINED CMAKE_CUDA_ARCHITECTURES )
 endif()
 
 # Set up bundled dependencies
-add_subdirectory(libs/tnl)
+add_subdirectory(libs/tnl EXCLUDE_FROM_ALL)
 
 # Find third-party dependencies
 find_package(ZLIB)
