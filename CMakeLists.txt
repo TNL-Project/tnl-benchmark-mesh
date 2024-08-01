@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.24)
+cmake_minimum_required(VERSION 3.28)
 project(tnl-benchmark-mesh
     LANGUAGES CXX CUDA
 )
@@ -32,8 +32,14 @@ if( NOT DEFINED CMAKE_CUDA_ARCHITECTURES )
     set(CMAKE_CUDA_ARCHITECTURES "native")
 endif()
 
-# Set up bundled dependencies
-add_subdirectory(libs/tnl EXCLUDE_FROM_ALL)
+# Add dependencies
+include(FetchContent)
+FetchContent_Declare(TNL
+    GIT_REPOSITORY https://gitlab.com/tnl-project/tnl.git
+    GIT_TAG main
+    EXCLUDE_FROM_ALL
+)
+FetchContent_MakeAvailable(TNL)
 
 # Find third-party dependencies
 find_package(ZLIB)

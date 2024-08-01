@@ -12,9 +12,9 @@ with GPU support](https://doi.org/10.1145/3536164).
    [Python 3](https://www.python.org/), and
    [CUDA 11](https://developer.nvidia.com/cuda-toolkit) are installed on your Linux system.
 
-2. Clone the repository and initialize the submodules:
+2. Clone the repository:
 
-       git clone --recurse-submodules https://gitlab.com/tnl-project/tnl-benchmark-mesh.git
+       git clone https://gitlab.com/tnl-project/tnl-benchmark-mesh.git
 
 3. Build the benchmark binaries:
 
