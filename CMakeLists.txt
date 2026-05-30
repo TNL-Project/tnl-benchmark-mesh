@@ -46,18 +46,16 @@ find_package(ZLIB)
 find_package(tinyxml2)
 
 # Add executables
-file( GLOB EXPLICIT_TEMPLATES_CPP MeshBenchmarksRunner.templates/*.cpp )
-file( GLOB EXPLICIT_TEMPLATES_CU MeshBenchmarksRunner.templates/*.cu )
-add_executable(tnl-benchmark-mesh tnl-benchmark-mesh.cpp ${EXPLICIT_TEMPLATES_CPP})
-add_executable(tnl-benchmark-mesh-cuda tnl-benchmark-mesh-cuda.cu ${EXPLICIT_TEMPLATES_CU})
+add_executable(tnl-benchmark-mesh tnl-benchmark-mesh.cpp)
+add_executable(tnl-benchmark-mesh-cuda tnl-benchmark-mesh-cuda.cu)
 
 # Set target options
 set(MY_TARGETS
     tnl-benchmark-mesh
     tnl-benchmark-mesh-cuda
 )
-target_link_libraries(tnl-benchmark-mesh PUBLIC TNL::TNL_CXX)
-target_link_libraries(tnl-benchmark-mesh-cuda PUBLIC TNL::TNL_CUDA)
+target_link_libraries(tnl-benchmark-mesh PUBLIC TNL::TNL)
+target_link_libraries(tnl-benchmark-mesh-cuda PUBLIC TNL::TNL)
 foreach( target IN ITEMS ${MY_TARGETS} )
     if( ZLIB_FOUND )
         target_compile_definitions(${target} PUBLIC "-DHAVE_ZLIB")
