@@ -122,7 +122,7 @@ getSelfPhysicalMemory()
 }
 
 
-#include <TNL/Benchmarks/Benchmarks.h>
+#include <TNL/Benchmarks/Benchmark.h>
 #include <TNL/Config/ParameterContainer.h>
 #include <TNL/Containers/Vector.h>
 

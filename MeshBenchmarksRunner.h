@@ -13,7 +13,7 @@ template< template< typename, int, typename, typename, typename > class ConfigTe
           typename GlobalIndex,
           typename LocalIndex >
 bool
-dispatch( Benchmark<> & benchmark,
+dispatch( Benchmark & benchmark,
           const Config::ParameterContainer & parameters,
           std::shared_ptr< MeshReader > reader )
 {
@@ -60,7 +60,7 @@ template< template< typename, int, typename, typename, typename > class ConfigTe
           typename GlobalIndex,
           typename LocalIndex >
 bool
-resolveCellTopology( Benchmark<> & benchmark,
+resolveCellTopology( Benchmark & benchmark,
                      const Config::ParameterContainer & parameters )
 {
    const String & meshFile = parameters.getParameter< String >( "mesh-file" );
@@ -109,12 +109,8 @@ template< typename Real,
           typename LocalIndex >
 struct MeshBenchmarksRunner
 {
-    // IMPORTANT NOTE:
-    // The definition of the method must be separate from its declaration,
-    // otherwise the compiler would always do implicit instead of explicit
-    // instantiation.
     static bool
-    run( Benchmark<> & benchmark,
+    run( Benchmark & benchmark,
          const Config::ParameterContainer & parameters );
 };
 
@@ -123,18 +119,11 @@ template< typename Real,
           typename LocalIndex >
 bool
 MeshBenchmarksRunner< Real, GlobalIndex, LocalIndex >::
-run( Benchmark<> & benchmark,
+run( Benchmark & benchmark,
      const Config::ParameterContainer & parameters )
 {
    return resolveCellTopology< MinimalConfig, Real, GlobalIndex, LocalIndex >( benchmark, parameters ) &&
           resolveCellTopology< FullConfig, Real, GlobalIndex, LocalIndex >( benchmark, parameters );
 }
 
-extern template struct MeshBenchmarksRunner< float, int, short int >;
-extern template struct MeshBenchmarksRunner< float, int, int >;
-extern template struct MeshBenchmarksRunner< float, long int, short int >;
-extern template struct MeshBenchmarksRunner< float, long int, int >;
-extern template struct MeshBenchmarksRunner< double, int, short int >;
-extern template struct MeshBenchmarksRunner< double, int, int >;
-extern template struct MeshBenchmarksRunner< double, long int, short int >;
-extern template struct MeshBenchmarksRunner< double, long int, int >;
+

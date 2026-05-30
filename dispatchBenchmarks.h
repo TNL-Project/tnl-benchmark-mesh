@@ -14,7 +14,7 @@
 #include <TNL/Pointers/DevicePointer.h>
 #include <TNL/Algorithms/parallelFor.h>
 #include <TNL/Algorithms/staticFor.h>
-#include <TNL/Benchmarks/Benchmarks.h>
+#include <TNL/Benchmarks/Benchmark.h>
 
 #include "MemoryInfo.h"
 #include "Utils.h"
@@ -91,7 +91,7 @@ getSimplexMeasure( const TNL::Containers::StaticVector< 3, Real > (& points) [4]
 }
 
 
-static void benchmark_reader( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, std::shared_ptr< MeshReader > reader )
+static void benchmark_reader( Benchmark & benchmark, const Config::ParameterContainer & parameters, std::shared_ptr< MeshReader > reader )
 {
    if( ! checkDevice< Devices::Host >( parameters ) )
       return;
@@ -110,7 +110,7 @@ static void benchmark_reader( Benchmark<> & benchmark, const Config::ParameterCo
 }
 
 template< typename Mesh >
-void benchmark_init( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, std::shared_ptr< MeshReader > reader )
+void benchmark_init( Benchmark & benchmark, const Config::ParameterContainer & parameters, std::shared_ptr< MeshReader > reader )
 {
    if( ! checkDevice< Devices::Host >( parameters ) )
       return;
@@ -132,7 +132,7 @@ void benchmark_init( Benchmark<> & benchmark, const Config::ParameterContainer &
 template< typename DeviceFrom,
           typename DeviceTo,
           typename M >
-static void benchmark_copy( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const M & mesh_src )
+static void benchmark_copy( Benchmark & benchmark, const Config::ParameterContainer & parameters, const M & mesh_src )
 {
    using MeshFrom = Meshes::Mesh< typename M::Config, DeviceFrom >;
    using MeshTo = Meshes::Mesh< typename M::Config, DeviceTo >;
@@ -157,7 +157,7 @@ static void benchmark_copy( Benchmark<> & benchmark, const Config::ParameterCont
 }
 
 template< int EntityDimension, typename Device, typename Mesh >
-void benchmark_centers( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const Mesh & mesh_src )
+void benchmark_centers( Benchmark & benchmark, const Config::ParameterContainer & parameters, const Mesh & mesh_src )
 {
    using Index = typename Mesh::GlobalIndexType;
    using PointType = typename Mesh::PointType;
@@ -201,7 +201,7 @@ void benchmark_centers( Benchmark<> & benchmark, const Config::ParameterContaine
 }
 
 template< int EntityDimension, typename Device, typename Mesh >
-static void benchmark_measures( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const Mesh & mesh_src )
+static void benchmark_measures( Benchmark & benchmark, const Config::ParameterContainer & parameters, const Mesh & mesh_src )
 {
    using Real = typename Mesh::RealType;
    using Index = typename Mesh::GlobalIndexType;
@@ -245,7 +245,7 @@ static void benchmark_measures( Benchmark<> & benchmark, const Config::Parameter
 }
 
 template< typename Device, typename Mesh >
-static void benchmark_boundary_measures( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const Mesh & mesh_src )
+static void benchmark_boundary_measures( Benchmark & benchmark, const Config::ParameterContainer & parameters, const Mesh & mesh_src )
 {
    using Real = typename Mesh::RealType;
    using Index = typename Mesh::GlobalIndexType;
@@ -297,7 +297,7 @@ static void benchmark_boundary_measures( Benchmark<> & benchmark, const Config::
 }
 
 template< typename Device, typename Mesh >
-static void benchmark_spheres( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const Mesh & mesh_src )
+static void benchmark_spheres( Benchmark & benchmark, const Config::ParameterContainer & parameters, const Mesh & mesh_src )
 {
    static_assert( std::is_same< typename Mesh::Config::CellTopology, Topologies::Triangle >::value ||
                   std::is_same< typename Mesh::Config::CellTopology, Topologies::Tetrahedron >::value,
@@ -375,7 +375,7 @@ static void benchmark_spheres( Benchmark<> & benchmark, const Config::ParameterC
 template< EntityDecomposerVersion DecomposerVersion,
           EntityDecomposerVersion SubDecomposerVersion = EntityDecomposerVersion::ConnectEdgesToPoint,
           typename M >
-static void benchmark_decomposition( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const M & mesh_src )
+static void benchmark_decomposition( Benchmark & benchmark, const Config::ParameterContainer & parameters, const M & mesh_src )
 {
    // skip benchmarks on devices which the user did not select
    if( ! checkDevice< Devices::Host >( parameters ) )
@@ -394,7 +394,7 @@ template< EntityDecomposerVersion DecomposerVersion,
           std::enable_if_t< M::Config::spaceDimension == 3 &&
                            (std::is_same< typename M::Config::CellTopology, Topologies::Polygon >::value ||
                             std::is_same< typename M::Config::CellTopology, Topologies::Polyhedron >::value ), bool > = true >
-static void benchmark_planar( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const M & mesh_src )
+static void benchmark_planar( Benchmark & benchmark, const Config::ParameterContainer & parameters, const M & mesh_src )
 {
    if( ! checkDevice< Devices::Host >( parameters ) )
       return;
@@ -408,21 +408,21 @@ static void benchmark_planar( Benchmark<> & benchmark, const Config::ParameterCo
 }
 
 
-static void ReaderDispatch( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, std::shared_ptr< MeshReader > reader )
+static void ReaderDispatch( Benchmark & benchmark, const Config::ParameterContainer & parameters, std::shared_ptr< MeshReader > reader )
 {
    benchmark.setOperation( String( "Reader" ) );
    benchmark_reader( benchmark, parameters, reader );
 }
 
 template< typename Mesh >
-static void InitDispatch( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, std::shared_ptr< MeshReader > reader )
+static void InitDispatch( Benchmark & benchmark, const Config::ParameterContainer & parameters, std::shared_ptr< MeshReader > reader )
 {
    benchmark.setOperation( String( "Init" ) );
    benchmark_init< Mesh >( benchmark, parameters, reader );
 }
 
 template< typename M >
-static void CopyDispatch( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const M & mesh )
+static void CopyDispatch( Benchmark & benchmark, const Config::ParameterContainer & parameters, const M & mesh )
 {
    benchmark.setOperation( String("Copy CPU->CPU") );
    benchmark_copy< Devices::Host, Devices::Host >( benchmark, parameters, mesh );
@@ -437,7 +437,7 @@ static void CopyDispatch( Benchmark<> & benchmark, const Config::ParameterContai
 }
 
 template< int EntityDimension, typename M >
-static void CentersDispatch( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const M & mesh )
+static void CentersDispatch( Benchmark & benchmark, const Config::ParameterContainer & parameters, const M & mesh )
 {
    if constexpr( M::Config::subentityStorage( M::getMeshDimension(), 0 ) )
    {
@@ -450,7 +450,7 @@ static void CentersDispatch( Benchmark<> & benchmark, const Config::ParameterCon
 }
 
 template< int EntityDimension, typename M >
-static void MeasuresDispatch( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const M & mesh )
+static void MeasuresDispatch( Benchmark & benchmark, const Config::ParameterContainer & parameters, const M & mesh )
 {
    benchmark.setOperation( String("Measures (d = ") + convertToString(EntityDimension) + ")" );
    benchmark_measures< EntityDimension, Devices::Host >( benchmark, parameters, mesh );
@@ -460,7 +460,7 @@ static void MeasuresDispatch( Benchmark<> & benchmark, const Config::ParameterCo
 }
 
 template< typename M >
-static void BoundaryMeasuresDispatch( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const M & mesh )
+static void BoundaryMeasuresDispatch( Benchmark & benchmark, const Config::ParameterContainer & parameters, const M & mesh )
 {
    benchmark.setOperation( "Boundary measures" );
    benchmark_boundary_measures< Devices::Host >( benchmark, parameters, mesh );
@@ -470,7 +470,7 @@ static void BoundaryMeasuresDispatch( Benchmark<> & benchmark, const Config::Par
 }
 
 template< typename M >
-static void SpheresDispatch( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const M & mesh )
+static void SpheresDispatch( Benchmark & benchmark, const Config::ParameterContainer & parameters, const M & mesh )
 {
    if constexpr( std::is_same< typename M::Config::CellTopology, Topologies::Triangle >::value ||
                   std::is_same< typename M::Config::CellTopology, Topologies::Tetrahedron >::value )
@@ -484,7 +484,7 @@ static void SpheresDispatch( Benchmark<> & benchmark, const Config::ParameterCon
 }
 
 template< typename M >
-static void DecompositionDispatch( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const M & mesh_src )
+static void DecompositionDispatch( Benchmark & benchmark, const Config::ParameterContainer & parameters, const M & mesh_src )
 {
    // Polygonal Mesh
    if constexpr( std::is_same< typename M::Config::CellTopology, Topologies::Polygon >::value )
@@ -518,7 +518,7 @@ static void DecompositionDispatch( Benchmark<> & benchmark, const Config::Parame
 }
 
 template< typename M >
-static void PlanarDispatch( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const M & mesh_src )
+static void PlanarDispatch( Benchmark & benchmark, const Config::ParameterContainer & parameters, const M & mesh_src )
 {
    if constexpr( M::Config::spaceDimension == 3 &&
                   (std::is_same< typename M::Config::CellTopology, Topologies::Polygon >::value ||
@@ -534,7 +534,7 @@ static void PlanarDispatch( Benchmark<> & benchmark, const Config::ParameterCont
 
 
 template< typename Mesh >
-void dispatchBenchmarks( Benchmark<> & benchmark, const Config::ParameterContainer & parameters, const Mesh & mesh, std::shared_ptr< MeshReader > reader )
+void dispatchBenchmarks( Benchmark & benchmark, const Config::ParameterContainer & parameters, const Mesh & mesh, std::shared_ptr< MeshReader > reader )
 {
    const std::set< std::string > benchmarks = parse_comma_list( parameters, "benchmarks", valid_benchmarks );
 

@@ -1,13 +1,8 @@
 default:
-  image: "jlk.fjfi.cvut.cz:5000/fjfi-mmg/archlinux-tnl-cuda:latest"
+  image: "registry.gitlab.com/tnl-project/container-images/archlinux-tnl-cuda:latest"
   before_script:
     # make sure that $PATH and other essential variables are set correctly
     - source /etc/profile
-
-# automatically initialize git submodules
-# https://docs.gitlab.com/ee/ci/git_submodules.html
-variables:
-  GIT_SUBMODULE_STRATEGY: recursive
 
 stages:
   - build
@@ -15,13 +10,11 @@ stages:
 build_Release:
   stage: build
   script:
-    - python3 MeshBenchmarksRunner.py
     - cmake -B build -S . -G Ninja -DCMAKE_BUILD_TYPE=Release
-    - ninja -C build
+    - cmake --build build
 
 build_Debug:
   stage: build
   script:
-    - python3 MeshBenchmarksRunner.py
     - cmake -B build -S . -G Ninja -DCMAKE_BUILD_TYPE=Debug
-    - ninja -C build
+    - cmake --build build
